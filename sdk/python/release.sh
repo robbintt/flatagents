@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 # Setup virtualenv with build tools
 if [ ! -d ~/virtualenvs/twine ]; then
     python -m venv ~/virtualenvs/twine
-    ~/virtualenvs/twine/bin/pip install build twine
+    ~/virtualenvs/twine/bin/pip install --upgrade build twine
 fi
 source ~/virtualenvs/twine/bin/activate
 
