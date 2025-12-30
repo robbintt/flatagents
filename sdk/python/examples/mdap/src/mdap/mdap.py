@@ -1,5 +1,5 @@
 """
-MDAP Orchestration for FlatAgent v0.5.0.
+MDAP Orchestration for FlatAgent v0.6.0.
 
 Implements the first-to-ahead-by-k voting mechanism from the MAKER paper.
 Handles multi-sampling, regex parsing, validation, and state management.
@@ -45,7 +45,7 @@ class MDAPMetrics:
 
 class MDAPOrchestrator:
     """
-    MDAP voting orchestrator for FlatAgent v0.5.0.
+    MDAP voting orchestrator for FlatAgent v0.6.0.
 
     Uses the agent for prompt rendering, handles LLM calls, regex parsing,
     validation, and voting. State management is external to the agent.

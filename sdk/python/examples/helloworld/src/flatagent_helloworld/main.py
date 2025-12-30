@@ -12,7 +12,7 @@ async def run():
     """
     Main function to run the FlatAgent HelloWorld demo.
 
-    In v0.5.0, the agent is a single LLM call. The loop is managed here.
+    In v0.6.0, the agent is a single LLM call. The loop is managed here.
     """
     print("--- Starting FlatAgent HelloWorld Demo ---")
 
@@ -27,7 +27,7 @@ async def run():
     print(f"Agent: {agent.agent_name}")
     print(f"Model: {agent.model}\n")
 
-    # Initialize state (workflow manages this in v0.5.0)
+    # Initialize state (workflow manages this in v0.6.0)
     current = ""
     target = "Hello, World!"
     max_steps = 50

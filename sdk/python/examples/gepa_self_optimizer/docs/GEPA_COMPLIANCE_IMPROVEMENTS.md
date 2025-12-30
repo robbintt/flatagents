@@ -371,7 +371,7 @@ def _gather_traces(self, examples: list[dict], result: EvaluationResult) -> list
 
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: reflective-updater

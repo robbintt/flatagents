@@ -22,7 +22,7 @@ Define agents in YAML or JSON. Both formats are first-class.
 **agent.yml**
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: summarizer
@@ -41,7 +41,7 @@ data:
 ```json
 {
   "spec": "flatagent",
-  "spec_version": "0.5.0",
+  "spec_version": "0.6.0",
   "data": {
     "name": "summarizer",
     "model": {
@@ -77,7 +77,7 @@ pip install flatagents[litellm]
 **writer.yaml**
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: writer
@@ -99,7 +99,7 @@ data:
 **critic.yaml**
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: critic
@@ -158,7 +158,7 @@ from flatagents import FlatAgent
 
 config = {
     "spec": "flatagent",
-    "spec_version": "0.5.0",
+    "spec_version": "0.6.0",
     "data": {
         "name": "calculator",
         "model": {"provider": "openai", "name": "gpt-4"},

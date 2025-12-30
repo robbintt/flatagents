@@ -15,7 +15,7 @@ See [`flatagent.d.ts`](./flatagent.d.ts) for the full TypeScript schema.
 
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: my-agent
@@ -36,7 +36,7 @@ Define agents in YAML or JSON—both are first-class.
 **critic.yml**
 ```yaml
 spec: flatagent
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 data:
   name: critic
@@ -72,7 +72,7 @@ metadata:
 ```json
 {
   "spec": "flatagent",
-  "spec_version": "0.5.0",
+  "spec_version": "0.6.0",
   "data": {
     "name": "critic",
     "model": {
