@@ -4,6 +4,8 @@ uv.lock
 node_modules
 __pycache__
 dist
+
 local
+.claude
 
 .DS_Store

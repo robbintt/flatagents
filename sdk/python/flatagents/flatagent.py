@@ -27,6 +27,11 @@ try:
 except ImportError:
     litellm = None
 
+try:
+    import aisuite
+except ImportError:
+    aisuite = None
+
 
 class FlatAgent:
     """
@@ -98,16 +103,20 @@ class FlatAgent:
         config_file: Optional[str] = None,
         config_dict: Optional[Dict] = None,
         tool_provider: Optional["MCPToolProvider"] = None,
+        backend: Optional[str] = None,
         **kwargs
     ):
         if jinja2 is None:
             raise ImportError("jinja2 is required for FlatAgent. Install with: pip install jinja2")
-        if litellm is None:
-            raise ImportError("litellm is required for FlatAgent. Install with: pip install litellm")
 
         self._load_config(config_file, config_dict, **kwargs)
         self._validate_spec()
         self._parse_agent_config()
+
+        # Determine backend: explicit param > config > auto-detect
+        config_backend = self.config.get('data', {}).get('model', {}).get('backend')
+        self._backend = backend or config_backend or self._auto_detect_backend()
+        self._init_backend()
 
         # MCP support
         self._tool_provider = tool_provider
@@ -117,7 +126,95 @@ class FlatAgent:
         self.total_cost = 0.0
         self.total_api_calls = 0
 
-        logger.info(f"Initialized FlatAgent: {self.agent_name}")
+        logger.info(f"Initialized FlatAgent: {self.agent_name} (backend: {self._backend})")
+
+    def _auto_detect_backend(self) -> str:
+        """Auto-detect available backend, preferring aisuite."""
+        if aisuite is not None:
+            return "aisuite"
+        if litellm is not None:
+            return "litellm"
+        raise ImportError(
+            "No LLM backend available. Install one of:\n"
+            "  pip install aisuite    (recommended)\n"
+            "  pip install litellm"
+        )
+
+    def _init_backend(self) -> None:
+        """Initialize the selected backend."""
+        if self._backend == "aisuite":
+            if aisuite is None:
+                raise ImportError("aisuite backend selected but not installed. Install with: pip install aisuite")
+            self._aisuite_client = aisuite.Client()
+        elif self._backend == "litellm":
+            if litellm is None:
+                raise ImportError("litellm backend selected but not installed. Install with: pip install litellm")
+        else:
+            raise ValueError(f"Unknown backend: {self._backend}. Use 'aisuite' or 'litellm'.")
+
+    async def _call_llm(self, params: Dict[str, Any]) -> Any:
+        """Call the LLM using the selected backend."""
+        import asyncio
+
+        if self._backend == "aisuite":
+            return await self._call_aisuite(params)
+        else:
+            return await litellm.acompletion(**params)
+
+    async def _call_aisuite(self, params: Dict[str, Any]) -> Any:
+        """Call LLM via aisuite backend."""
+        import asyncio
+
+        model = params["model"]
+        if "/" in model:
+            model = model.replace("/", ":", 1)
+
+        provider_key, model_name = model.split(":", 1)
+
+        # WORKAROUND: aisuite drops tools unless max_turns is set.
+        # Use direct provider call for Cerebras.
+        if provider_key == "cerebras":
+            return await self._call_aisuite_cerebras_direct(model_name, params)
+
+        call_params = {
+            "model": model,
+            "messages": params["messages"],
+            "temperature": params.get("temperature", 0.7),
+            "max_tokens": params.get("max_tokens", 2048),
+        }
+        if "tools" in params:
+            call_params["tools"] = params["tools"]
+
+        response = await asyncio.to_thread(
+            self._aisuite_client.chat.completions.create,
+            **call_params
+        )
+
+        return response
+
+    async def _call_aisuite_cerebras_direct(self, model_name: str, params: Dict[str, Any]) -> Any:
+        """Direct Cerebras provider call. Workaround for aisuite dropping tools."""
+        import asyncio
+        from aisuite.provider import ProviderFactory
+
+        config = self._aisuite_client.provider_configs.get("cerebras", {})
+        provider = ProviderFactory.create_provider("cerebras", config)
+
+        kwargs = {
+            "temperature": params.get("temperature", 0.7),
+            "max_tokens": params.get("max_tokens", 2048),
+        }
+        if "tools" in params:
+            kwargs["tools"] = params["tools"]
+
+        response = await asyncio.to_thread(
+            provider.chat_completions_create,
+            model_name,
+            params["messages"],
+            **kwargs
+        )
+
+        return response
 
     def _load_config(
         self,
@@ -164,6 +261,9 @@ class FlatAgent:
         self.model = kwargs.get('model', full_model_name)
         self.temperature = kwargs.get('temperature', model_config.get('temperature', 0.7))
         self.max_tokens = kwargs.get('max_tokens', model_config.get('max_tokens', 2048))
+
+        # Store full model config for template access (includes custom fields)
+        self._model_config_raw = model_config
 
     def _validate_spec(self):
         """Validate the spec envelope."""
@@ -386,9 +486,17 @@ class FlatAgent:
         Returns:
             Rendered system prompt
         """
+        # Merge raw config with computed values for template access
+        model_config = {
+            **self._model_config_raw,
+            "name": self.model,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
         return self._compiled_system.render(
             tools_prompt=tools_prompt,
-            tools=tools or []
+            tools=tools or [],
+            model=model_config
         )
 
     def _render_user_prompt(
@@ -408,10 +516,18 @@ class FlatAgent:
         Returns:
             Rendered user prompt
         """
+        # Merge raw config with computed values for template access
+        model_config = {
+            **self._model_config_raw,
+            "name": self.model,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
         prompt = self._compiled_user.render(
             input=input_data,
             tools_prompt=tools_prompt,
-            tools=tools or []
+            tools=tools or [],
+            model=model_config
         )
         if self._instruction_suffix:
             prompt = f"{prompt}\n\n{self._instruction_suffix}"
@@ -510,8 +626,8 @@ class FlatAgent:
         if self.output_schema and not tools:
             params["response_format"] = {"type": "json_object"}
 
-        # Call LLM
-        response = await litellm.acompletion(**params)
+        # Call LLM via selected backend
+        response = await self._call_llm(params)
 
         # Track usage
         self.total_api_calls += 1

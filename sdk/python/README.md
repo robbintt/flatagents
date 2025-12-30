@@ -235,6 +235,16 @@ More examples are available in the [`examples/`](https://github.com/memgrafter/f
 - **[mdap](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/mdap)** - Multi-step reasoning with calibrated confidence
 - **[gepa_self_optimizer](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/gepa_self_optimizer)** - Self-optimizing prompt evolution
 
+## Known Issues
+
+### aisuite drops tools from API calls
+
+When using the aisuite backend with tool calling (MCP), tools are silently dropped from the API request unless `max_turns` is set. This is a bug in aisuite's `client.chat.completions.create()` which pops the `tools` kwarg.
+
+**Workaround:** The SDK includes a direct provider call for Cerebras that bypasses aisuite's client. See `_call_aisuite_cerebras_direct()` in `flatagent.py`. Other providers may need similar workarounds until aisuite fixes this upstream.
+
+**Symptoms:** Model outputs tool call JSON in text content instead of using actual tool calling mechanism. Agent completes immediately with "no tool calls" when tools should have been invoked.
+
 ## License
 
 MIT License - see [LICENSE](../../LICENSE) for details.

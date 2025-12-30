@@ -1,0 +1,2 @@
+[console_scripts]
+search-refiner = search_refiner.main:main
