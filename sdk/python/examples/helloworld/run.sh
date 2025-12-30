@@ -2,11 +2,11 @@
 set -e
 
 # --- Configuration ---
-PROJECT_NAME="declarativeagent_helloworld"
+PROJECT_NAME="flatagent_helloworld"
 VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
 
 # --- Script Logic ---
-echo "--- DeclarativeAgent HelloWorld Demo Runner ---"
+echo "--- FlatAgent HelloWorld Demo Runner ---"
 
 # Get the directory the script is located in
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -42,7 +42,7 @@ uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR"
 # 4. Run the Demo
 echo "🚀 Running demo..."
 echo "---"
-"$VENV_PATH/bin/python" -m declarativeagent_helloworld.main
+"$VENV_PATH/bin/python" -m flatagent_helloworld.main
 echo "---"
 
 echo "✅ Demo complete!"

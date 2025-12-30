@@ -5,7 +5,7 @@
 set -e
 
 # --- Configuration ---
-PROJECT_NAME="declarative_gepa_self_optimizer"
+PROJECT_NAME="gepa_self_optimizer"
 VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
 
 # Get the directory where this script is located

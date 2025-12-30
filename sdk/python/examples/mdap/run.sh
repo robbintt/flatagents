@@ -2,11 +2,11 @@
 set -e
 
 # --- Configuration ---
-PROJECT_NAME="declarative_mdap"
+PROJECT_NAME="mdap"
 VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
 
 # --- Script Logic ---
-echo "--- Declarative MDAP Demo Runner ---"
+echo "--- MDAP Demo Runner ---"
 
 # Get the directory the script is located in (works from any directory)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -33,13 +33,13 @@ echo "Installing dependencies..."
 echo "  - Installing flatagents..."
 uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../..[litellm]"
 
-echo "  - Installing declarative_mdap package..."
+echo "  - Installing mdap package..."
 uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR"
 
 # 4. Run the Demo
 echo "Running demo..."
 echo "---"
-"$VENV_PATH/bin/python" -m declarative_mdap.demo
+"$VENV_PATH/bin/python" -m mdap.demo
 echo "---"
 
 echo "Demo complete!"

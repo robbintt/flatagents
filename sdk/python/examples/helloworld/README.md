@@ -1,9 +1,9 @@
-# DeclarativeAgent HelloWorld Demo
+# FlatAgent HelloWorld Demo
 
 A simple "Hello, World!" project that demonstrates how to use the `flatagents` library.
 
 The demo involves an agent that attempts to build the string "Hello, World!" by querying an LLM one character at a time. It showcases the core components of the library, including:
-- Using a `DeclarativeAgent` from YAML configuration.
+- Using a `FlatAgent` from YAML configuration.
 - Tracking execution statistics like cost and API calls.
 
 ## Prerequisites
@@ -32,7 +32,7 @@ If you prefer to set up the environment manually:
 
 1.  **Navigate into this project directory**:
     ```bash
-    cd examples/declarativeagent_helloworld
+    cd examples/helloworld
     ```
 2.  **Install dependencies** using `uv`:
     ```bash
@@ -45,5 +45,5 @@ If you prefer to set up the environment manually:
     ```
 4.  **Run the demo**:
     ```bash
-    uv run python -m declarativeagent_helloworld.main
+    uv run python -m flatagent_helloworld.main
     ```

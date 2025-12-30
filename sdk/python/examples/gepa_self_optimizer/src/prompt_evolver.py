@@ -1,5 +1,5 @@
 """
-Prompt evolution using declarative agents.
+Prompt evolution using flatagents.
 
 Implements GEPA's reflective prompt mutation based on execution traces.
 """
@@ -34,7 +34,7 @@ class PromptEvolver:
     """
     Evolves judge prompts using GEPA's reflective update mechanism.
 
-    Uses a declarative agent that follows the paper's meta-prompt structure
+    Uses a flatagent that follows the paper's meta-prompt structure
     for extracting factual knowledge from execution traces.
     """
 

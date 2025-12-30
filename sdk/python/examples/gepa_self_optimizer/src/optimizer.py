@@ -2,7 +2,7 @@
 Main GEPA self-optimizer implementing the paper's core algorithm.
 
 Implements Algorithm 1 (Main Loop) and Algorithm 2 (Pareto-Based Candidate Selection)
-from the GEPA paper. All LLM calls are made through declarative agents.
+from the GEPA paper. All LLM calls are made through flatagents.
 """
 
 import asyncio
@@ -181,7 +181,7 @@ class GEPASelfOptimizer:
     """
     Main optimizer implementing GEPA Algorithm 1 and Algorithm 2.
 
-    All LLM calls are made through declarative agents:
+    All LLM calls are made through flatagents:
     - Judge agent (target of optimization)
     - Task generator agent (for data generation)
     - Response generator agent (for data generation)
@@ -210,7 +210,7 @@ class GEPASelfOptimizer:
         self.agents_dir = self.config_dir / "agents"
         self.data_dir = self.config_dir.parent / "data"
 
-        # Initialize components (declarative agents loaded within)
+        # Initialize components (flatagents loaded within)
         self.data_generator = DataGenerator(self.config_dir)
         self.prompt_evolver = PromptEvolver(self.config_dir)
 

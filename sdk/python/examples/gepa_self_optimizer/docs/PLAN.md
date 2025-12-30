@@ -1,10 +1,10 @@
-# Declarative GEPA Self-Optimizer Plan
+# GEPA Self-Optimizer Plan
 
 ## Overview
 
-This project implements the GEPA (Genetic Prompt Algorithm) optimization algorithm using declarative agents. The implementation is **paper-compliant**, following Algorithm 1 (Main Loop) and Algorithm 2 (Pareto-Based Candidate Selection) from the GEPA paper.
+This project implements the GEPA (Genetic Prompt Algorithm) optimization algorithm using flatagents. The implementation is **paper-compliant**, following Algorithm 1 (Main Loop) and Algorithm 2 (Pareto-Based Candidate Selection) from the GEPA paper.
 
-Every LLM call is a declarative agent, making the entire system configurable via YAML files.
+Every LLM call is a flatagent, making the entire system configurable via YAML files.
 
 ## Goal
 
@@ -116,9 +116,9 @@ function SelectCandidate(P, S):
 +-------------------------------------------------------------------------+
 ```
 
-## Declarative Agents
+## FlatAgents
 
-Every LLM call is defined as a declarative agent in `config/agents/`:
+Every LLM call is defined as a flatagent in `config/agents/`:
 
 ### 1. Judge Agent (`judge.yml`)
 The target of optimization. Evaluates agent responses.
@@ -162,7 +162,7 @@ Generates optimization run summaries.
 ## File Structure
 
 ```
-declarative_gepa_self_optimizer/
+gepa_self_optimizer/
 ├── docs/
 │   ├── PLAN.md                          # This file
 │   ├── GEPA_COMPLIANCE_IMPROVEMENTS.md  # Analysis vs paper
@@ -180,10 +180,10 @@ declarative_gepa_self_optimizer/
 │   └── .gitkeep
 ├── src/
 │   ├── __init__.py
-│   ├── data_generator.py                # Uses declarative agents to generate data
+│   ├── data_generator.py                # Uses flatagents to generate data
 │   ├── evaluator.py                     # Runs judge and compares to ground truth
 │   ├── optimizer.py                     # GEPA Algorithm 1 & 2 implementation
-│   ├── prompt_evolver.py                # Reflective update via declarative agent
+│   ├── prompt_evolver.py                # Reflective update via flatagent
 │   └── utils.py                         # Utilities
 ├── output/
 │   ├── optimized_judge.yml              # Final optimized judge
@@ -258,7 +258,7 @@ python main.py optimize --budget 50
 5. **Ancestry tracking**: Records parent for each candidate
 6. **Reflective meta-prompt**: Extracts factual knowledge from traces
 
-### Declarative Agents
+### FlatAgents
 
 - Every prompt is visible and editable in YAML
 - Easy to swap models or providers via litellm
@@ -281,10 +281,10 @@ For Pareto selection, each candidate is scored on each D_pareto instance:
 
 ## Dependencies
 
-- `declarativeagent`: For running declarative agents (from lib/microagent)
+- `flatagents`: For running flatagents
 - `pyyaml`: Configuration files
-- `jinja2`: Template rendering (via declarativeagent)
-- `litellm`: LLM API calls (via declarativeagent)
+- `jinja2`: Template rendering (via flatagents)
+- `litellm`: LLM API calls (via flatagents)
 
 ## Success Criteria
 

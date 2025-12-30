@@ -2,7 +2,7 @@
 set -e
 
 # --- Configuration ---
-PROJECT_NAME="declarative_mdap"
+PROJECT_NAME="mdap"
 VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
 
 # --- Script Logic ---
@@ -28,7 +28,7 @@ fi
 # 3. Run Calibration (pass all arguments through)
 echo "Running calibration..."
 echo "---"
-"$VENV_PATH/bin/python" -m declarative_mdap.calibration "$@"
+"$VENV_PATH/bin/python" -m mdap.calibration "$@"
 echo "---"
 
 echo "Calibration complete!"

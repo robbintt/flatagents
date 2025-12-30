@@ -12,7 +12,7 @@ from .baseagent import (
     ToolsExtractor,
     RegexExtractor,
 )
-from .declarativeagent import DeclarativeAgent
+from .flatagent import FlatAgent
 
 __all__ = [
     "__version__",
@@ -26,5 +26,4 @@ __all__ = [
     "StructuredExtractor",
     "ToolsExtractor",
     "RegexExtractor",
-    "DeclarativeAgent",
 ]

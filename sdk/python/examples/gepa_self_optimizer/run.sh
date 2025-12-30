@@ -1,16 +1,16 @@
 #!/bin/bash
-# Declarative GEPA Self-Optimizer - Test Run
+# GEPA Self-Optimizer - Test Run
 # An inexpensive test run with minimal examples and iterations
 
 set -e
 
 # --- Configuration ---
-PROJECT_NAME="declarative_gepa_self_optimizer"
+PROJECT_NAME="gepa_self_optimizer"
 VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
 
 # --- Script Logic ---
 echo "=========================================="
-echo "Declarative GEPA Self-Optimizer - Test Run"
+echo "GEPA Self-Optimizer - Test Run"
 echo "=========================================="
 echo ""
 

@@ -304,9 +304,9 @@ async def run_hanoi_calibration(
     max_samples: Optional[int] = None
 ) -> CalibrationResult:
     """Convenience function to run Hanoi calibration."""
-    from flatagents import DeclarativeAgent
+    from flatagents import FlatAgent
 
-    agent = DeclarativeAgent(config_file=config_path)
+    agent = FlatAgent(config_file=config_path)
 
     # Use k=1 for raw success rate (no voting amplification)
     calibration_config = MDAPConfig(k_margin=1, max_candidates=1)

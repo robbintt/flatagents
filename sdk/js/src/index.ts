@@ -5,8 +5,8 @@
 
 export const VERSION = "0.1.0";
 
-// TODO: Implement DeclarativeAgent
-export class DeclarativeAgent {
+// TODO: Implement FlatAgent
+export class FlatAgent {
   constructor(config: AgentConfig | string) {
     throw new Error("Not implemented yet");
   }
@@ -16,9 +16,9 @@ export class DeclarativeAgent {
   }
 }
 
-// Types based on declarative-agent.d.ts spec
+// Types based on flatagent.d.ts spec
 export interface AgentConfig {
-  spec: "declarative_agent";
+  spec: "flatagent";
   spec_version: string;
   data: AgentData;
   metadata?: Record<string, unknown>;

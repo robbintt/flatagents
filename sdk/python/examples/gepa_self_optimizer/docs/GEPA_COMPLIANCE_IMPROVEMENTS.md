@@ -1,6 +1,6 @@
 # GEPA Compliance Improvements
 
-This document details the changes required to make the declarative GEPA implementation compliant with the paper's algorithm.
+This document details the changes required to make the GEPA implementation compliant with the paper's algorithm.
 
 ## Executive Summary
 
@@ -370,8 +370,8 @@ def _gather_traces(self, examples: list[dict], result: EvaluationResult) -> list
 **New `config/agents/reflective_updater.yml`**:
 
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: reflective-updater

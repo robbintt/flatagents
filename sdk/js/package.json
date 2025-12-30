@@ -12,7 +12,7 @@
     "prepublishOnly": "npm run build",
     "test": "echo \"No tests yet\""
   },
-  "keywords": ["llm", "agents", "ai", "framework", "declarative"],
+  "keywords": ["llm", "agents", "ai", "framework", "flatagent"],
   "author": "memgrafter@gmail.com",
   "license": "MIT",
   "repository": {

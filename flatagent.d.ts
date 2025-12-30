@@ -1,5 +1,5 @@
 /**
- * DeclarativeAgent Configuration Schema v0.4.0
+ * FlatAgents Configuration Schema v0.5.0
  * =============================================
  *
  * An agent is a single LLM call: model + prompts + output schema.
@@ -7,8 +7,8 @@
  *
  * STRUCTURE:
  * ----------
- * spec           - Fixed string "declarative_agent"
- * spec_version   - Semver string (e.g., "0.4.0")
+ * spec           - Fixed string "flatagents"
+ * spec_version   - Semver string (e.g., "0.1.0")
  * data           - The agent configuration
  * metadata       - Extensibility layer (runners ignore unrecognized keys)
  *
@@ -50,8 +50,8 @@
  * EXAMPLE CONFIGURATION:
  * ----------------------
  *
- *   spec: declarative_agent
- *   spec_version: "0.4.0"
+ *   spec: flatagents 
+ *   spec_version: "0.5.0"
  *
  *   data:
  *     name: critic
@@ -84,7 +84,7 @@
  */
 
 export interface AgentWrapper {
-  spec: "declarative_agent";
+  spec: "flatagents";
   spec_version: string;
   data: AgentData;
   metadata?: Record<string, any>;
@@ -120,4 +120,4 @@ export interface OutputFieldDef {
   properties?: OutputSchema;
 }
 
-export type DeclarativeAgentConfig = AgentWrapper;
+export type FlatagentsConfig = AgentWrapper;

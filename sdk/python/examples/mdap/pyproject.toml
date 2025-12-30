@@ -1,7 +1,7 @@
 [project]
-name = "declarative_mdap"
+name = "mdap"
 version = "0.1.0"
-description = "MDAP framework with declarative agents"
+description = "MDAP framework with flatagents"
 dependencies = ["flatagents[litellm]", "jsonschema"]
 requires-python = ">=3.10"
 
@@ -13,4 +13,4 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [project.scripts]
-mdap-demo = "declarative_mdap.demo:main"
+mdap-demo = "mdap.demo:main"

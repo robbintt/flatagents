@@ -1,7 +1,7 @@
 """
-Declarative GEPA Self-Optimizer
+GEPA Self-Optimizer
 
-A self-optimizer for GEPA judges using declarative agents for all LLM calls.
+A self-optimizer for GEPA judges using flatagents for all LLM calls.
 """
 
 from .data_generator import DataGenerator

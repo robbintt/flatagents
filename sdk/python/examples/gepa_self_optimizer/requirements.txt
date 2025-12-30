@@ -1,4 +1,4 @@
-# Declarative GEPA Self-Optimizer Dependencies
+# GEPA Self-Optimizer Dependencies
 
 # flatagents with litellm backend
 flatagents[litellm]

@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 
 def setup_logging(level: str = "INFO") -> logging.Logger:
@@ -48,14 +48,14 @@ def save_json(data: Any, path: Path) -> None:
         json.dump(data, f, indent=2)
 
 
-def load_agent(config_path: Path) -> DeclarativeAgent:
-    """Load a declarative agent from a config file."""
-    return DeclarativeAgent(config_file=str(config_path))
+def load_agent(config_path: Path) -> FlatAgent:
+    """Load a flatagent from a config file."""
+    return FlatAgent(config_file=str(config_path))
 
 
-def create_agent_from_dict(config: dict) -> DeclarativeAgent:
-    """Create a declarative agent from a config dictionary."""
-    return DeclarativeAgent(config_dict=config)
+def create_agent_from_dict(config: dict) -> FlatAgent:
+    """Create a flatagent from a config dictionary."""
+    return FlatAgent(config_dict=config)
 
 
 def update_agent_prompts(

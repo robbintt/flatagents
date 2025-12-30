@@ -1,7 +1,7 @@
 """
-DeclarativeAgent - A single LLM call configured entirely via YAML or JSON.
+FlatAgent - A single LLM call configured entirely via YAML or JSON.
 
-See declarative-agent.d.ts for the TypeScript type definition.
+See flatagent.d.ts for the TypeScript type definition.
 
 An agent is a single LLM call: model + prompts + output schema.
 Workflows handle composition, branching, and loops.
@@ -24,14 +24,14 @@ except ImportError:
     litellm = None
 
 
-class DeclarativeAgent:
+class FlatAgent:
     """
     A single LLM call configured entirely via YAML. No code required.
 
-    v0.4.0 Container format:
+    v0.5.0 Container format:
 
-        spec: declarative_agent
-        spec_version: "0.4.0"
+        spec: flatagent
+        spec_version: "0.5.0"
 
         data:
           name: greeter
@@ -55,12 +55,12 @@ class DeclarativeAgent:
           author: "your-name"
 
     Example usage:
-        agent = DeclarativeAgent(config_file="agent.yaml")
+        agent = FlatAgent(config_file="agent.yaml")
         result = await agent.call(name="Alice")
         print(result)  # {"greeting": "Hello, Alice!"}
     """
 
-    SPEC_VERSION = "0.4.0"
+    SPEC_VERSION = "0.5.0"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
     def __init__(
@@ -70,9 +70,9 @@ class DeclarativeAgent:
         **kwargs
     ):
         if jinja2 is None:
-            raise ImportError("jinja2 is required for DeclarativeAgent. Install with: pip install jinja2")
+            raise ImportError("jinja2 is required for FlatAgent. Install with: pip install jinja2")
         if litellm is None:
-            raise ImportError("litellm is required for DeclarativeAgent. Install with: pip install litellm")
+            raise ImportError("litellm is required for FlatAgent. Install with: pip install litellm")
 
         self._load_config(config_file, config_dict, **kwargs)
         self._validate_spec()
@@ -82,7 +82,7 @@ class DeclarativeAgent:
         self.total_cost = 0.0
         self.total_api_calls = 0
 
-        logger.info(f"Initialized DeclarativeAgent: {self.agent_name}")
+        logger.info(f"Initialized FlatAgent: {self.agent_name}")
 
     def _load_config(
         self,
@@ -90,7 +90,7 @@ class DeclarativeAgent:
         config_dict: Optional[Dict],
         **kwargs
     ):
-        """Load v0.4.0 container config."""
+        """Load v0.5.0 container config."""
         import os
         try:
             import yaml
@@ -134,21 +134,21 @@ class DeclarativeAgent:
         """Validate the spec envelope."""
         config = self.config
 
-        if config.get('spec') != 'declarative_agent':
+        if config.get('spec') != 'flatagent':
             raise ValueError(
-                f"Invalid spec: expected 'declarative_agent', got '{config.get('spec')}'. "
-                "Config must have: spec: declarative_agent"
+                f"Invalid spec: expected 'flatagent', got '{config.get('spec')}'. "
+                "Config must have: spec: flatagent"
             )
 
         if 'data' not in config:
             raise ValueError("Config missing 'data' section")
 
         spec_version = config.get('spec_version', '')
-        if not spec_version.startswith('0.4'):
+        if not spec_version.startswith('0.5'):
             logger.warning(f"spec_version '{spec_version}' may not be fully compatible with {self.SPEC_VERSION}")
 
     def _parse_agent_config(self):
-        """Parse the v0.4.0 declarative configuration."""
+        """Parse the v0.5.0 flatagent configuration."""
         data = self.config['data']
         self.metadata = self.config.get('metadata', {})
 

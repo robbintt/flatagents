@@ -3,18 +3,18 @@ import logging
 import os
 from pathlib import Path
 
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 async def run():
     """
-    Main function to run the DeclarativeAgent HelloWorld demo.
+    Main function to run the FlatAgent HelloWorld demo.
 
-    In v0.4.0, the agent is a single LLM call. The loop is managed here.
+    In v0.5.0, the agent is a single LLM call. The loop is managed here.
     """
-    print("--- Starting DeclarativeAgent HelloWorld Demo ---")
+    print("--- Starting FlatAgent HelloWorld Demo ---")
 
     if not os.environ.get("OPENAI_API_KEY") and not os.environ.get("CEREBRAS_API_KEY"):
         print("WARNING: No API key found in environment (OPENAI_API_KEY, CEREBRAS_API_KEY). "
@@ -22,12 +22,12 @@ async def run():
 
     # Load the agent from YAML
     config_path = Path(__file__).parent.parent.parent / 'config' / 'agent.yml'
-    agent = DeclarativeAgent(config_file=str(config_path))
+    agent = FlatAgent(config_file=str(config_path))
 
     print(f"Agent: {agent.agent_name}")
     print(f"Model: {agent.model}\n")
 
-    # Initialize state (workflow manages this in v0.4.0)
+    # Initialize state (workflow manages this in v0.5.0)
     current = ""
     target = "Hello, World!"
     max_steps = 50

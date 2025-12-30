@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Declarative GEPA Self-Optimizer
+GEPA Self-Optimizer
 
-Optimizes a GEPA judge using declarative agents for all LLM calls.
+Optimizes a GEPA judge using flatagents for all LLM calls.
 
 Usage:
     python main.py run                    # Full pipeline
@@ -29,7 +29,7 @@ from src.utils import load_json, setup_logging
 def get_parser() -> argparse.ArgumentParser:
     """Create argument parser."""
     parser = argparse.ArgumentParser(
-        description="Declarative GEPA Self-Optimizer",
+        description="GEPA Self-Optimizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

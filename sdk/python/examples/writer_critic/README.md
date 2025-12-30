@@ -3,7 +3,7 @@
 A multi-agent example demonstrating iterative refinement using the `flatagents` library.
 
 This demo showcases:
-- Two `DeclarativeAgent` instances working together
+- Two `FlatAgent` instances working together
 - An iterative feedback loop between agents
 - Using Jinja2 templates for conditional prompts
 

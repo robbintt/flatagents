@@ -1,8 +1,8 @@
-# Tower of Hanoi agent configuration for MDAP v0.4.0
+# Tower of Hanoi agent configuration for MDAP v0.5.0
 # Prompts copied exactly from mdap/hanoi_solver.py
 
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: hanoi-mdap

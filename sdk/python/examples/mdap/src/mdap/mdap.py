@@ -1,5 +1,5 @@
 """
-MDAP Orchestration for DeclarativeAgent v0.4.0.
+MDAP Orchestration for FlatAgent v0.5.0.
 
 Implements the first-to-ahead-by-k voting mechanism from the MAKER paper.
 Handles multi-sampling, regex parsing, validation, and state management.
@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import jsonschema
 import litellm
 
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class MDAPMetrics:
 
 class MDAPOrchestrator:
     """
-    MDAP voting orchestrator for DeclarativeAgent v0.4.0.
+    MDAP voting orchestrator for FlatAgent v0.5.0.
 
     Uses the agent for prompt rendering, handles LLM calls, regex parsing,
     validation, and voting. State management is external to the agent.
@@ -53,7 +53,7 @@ class MDAPOrchestrator:
 
     def __init__(
         self,
-        agent: DeclarativeAgent,
+        agent: FlatAgent,
         config: Optional[MDAPConfig] = None
     ):
         self.agent = agent
@@ -253,5 +253,5 @@ class MDAPOrchestrator:
 
 def create_orchestrator_from_config(config_path: str) -> MDAPOrchestrator:
     """Create orchestrator from YAML config file."""
-    agent = DeclarativeAgent(config_file=config_path)
+    agent = FlatAgent(config_file=config_path)
     return MDAPOrchestrator(agent)

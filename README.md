@@ -1,6 +1,6 @@
 # FlatAgents
 
-A declarative specification for LLM-powered agents. Define agents in YAML/JSON, run them anywhere.
+A specification for LLM-powered agents. Define agents in YAML/JSON, run them anywhere.
 
 - **Orchestrate via code or existing orchestration** - FlatAgents defines single agents, not workflows. Compose them using your language of choice or plug into existing orchestration frameworks.
 - **Use LLM-assisted coding to define your agent YAMLs** - For best results, let an LLM help you write and iterate on agent configurations.
@@ -9,13 +9,13 @@ A declarative specification for LLM-powered agents. Define agents in YAML/JSON, 
 
 An agent is a single LLM call: **model + prompts + output schema**. That's it.
 
-See [`declarative-agent.d.ts`](./declarative-agent.d.ts) for the full TypeScript schema.
+See [`flatagent.d.ts`](./flatagent.d.ts) for the full TypeScript schema.
 
 ### Structure
 
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: my-agent
@@ -35,8 +35,8 @@ Define agents in YAML or JSON—both are first-class.
 
 **critic.yml**
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: critic
@@ -71,8 +71,8 @@ metadata:
 **critic.json**
 ```json
 {
-  "spec": "declarative_agent",
-  "spec_version": "0.4.0",
+  "spec": "flatagent",
+  "spec_version": "0.5.0",
   "data": {
     "name": "critic",
     "model": {
@@ -194,9 +194,9 @@ pip install flatagents[litellm]
 ```
 
 ```python
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
-agent = DeclarativeAgent(config_file="agent.yaml")
+agent = FlatAgent(config_file="agent.yaml")
 result = await agent.execute(input={"question": "What is 2+2?"})
 ```
 
@@ -206,7 +206,7 @@ Coming soon.
 
 ## Design Principles
 
-1. **Declarative over imperative** - Define what you want, not how to get it
+1. **Definition over code** - Define what you want, not how to get it
 2. **Single responsibility** - One agent = one LLM call
 3. **Runtime agnostic** - Same spec works across different runners
 4. **Output-focused** - Declare the schema, let the runtime extract it

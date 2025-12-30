@@ -17,7 +17,7 @@ import logging
 import os
 from pathlib import Path
 
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,8 +46,8 @@ async def run(product: str = "a CLI tool for AI agents", max_rounds: int = 4, ta
     # Load agents from YAML configs
     config_dir = Path(__file__).parent.parent.parent / 'config'
 
-    writer = DeclarativeAgent(config_file=str(config_dir / 'writer.yml'))
-    critic = DeclarativeAgent(config_file=str(config_dir / 'critic.yml'))
+    writer = FlatAgent(config_file=str(config_dir / 'writer.yml'))
+    critic = FlatAgent(config_file=str(config_dir / 'critic.yml'))
 
     print(f"\nWriter Agent: {writer.agent_name}")
     print(f"Writer Model: {writer.model}")

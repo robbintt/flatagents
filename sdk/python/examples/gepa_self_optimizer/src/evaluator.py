@@ -1,5 +1,5 @@
 """
-Judge evaluator using declarative agents.
+Judge evaluator using flatagents.
 
 Runs the judge on evaluation data and calculates metrics.
 """

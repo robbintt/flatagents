@@ -1,8 +1,8 @@
 """
-Demo script for Declarative MDAP with Tower of Hanoi.
+Demo script for MDAP with Tower of Hanoi.
 
 Usage:
-    python -m declarative_mdap.demo
+    python -m mdap.demo
     # or via run.sh:
     ./run.sh
 """
@@ -12,7 +12,7 @@ import logging
 import os
 from pathlib import Path
 
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 from .mdap import MDAPOrchestrator
 
 logging.basicConfig(
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 async def run():
     """Run the Hanoi demo with MDAP."""
     print("=" * 60)
-    print("Declarative MDAP - Tower of Hanoi Demo")
+    print("MDAP - Tower of Hanoi Demo")
     print("=" * 60)
 
     # Check for API key
@@ -37,7 +37,7 @@ async def run():
     config_path = Path(__file__).parent.parent.parent / 'config' / 'hanoi.yml'
     print(f"\nLoading agent from: {config_path}")
 
-    agent = DeclarativeAgent(config_file=str(config_path))
+    agent = FlatAgent(config_file=str(config_path))
     print(f"Agent: {agent.agent_name}")
     print(f"Model: {agent.model}")
 

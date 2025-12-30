@@ -1,5 +1,5 @@
 """
-Data generation using declarative agents.
+Data generation using flatagents.
 
 Generates evaluation data with ground truth for training the judge.
 """
@@ -15,7 +15,7 @@ logger = setup_logging()
 
 
 class DataGenerator:
-    """Generates evaluation data using declarative agents."""
+    """Generates evaluation data using flatagents."""
 
     # Error types with their expected verdicts
     ERROR_TYPES = {
@@ -36,11 +36,11 @@ class DataGenerator:
         self.config_dir = config_dir
         self.agents_dir = config_dir / "agents"
 
-        # Load declarative agents
+        # Load flatagents
         self.task_generator = load_agent(self.agents_dir / "task_generator.yml")
         self.response_generator = load_agent(self.agents_dir / "response_generator.yml")
 
-        logger.info("DataGenerator initialized with declarative agents")
+        logger.info("DataGenerator initialized with flatagents")
 
     async def generate_task(self, domain: str, difficulty: str) -> dict:
         """Generate a single task using the task generator agent."""

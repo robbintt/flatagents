@@ -2,13 +2,13 @@
 
 **Status: Prototype**
 
-Python SDK for [FlatAgents](https://github.com/memgrafter/flatagents)—a declarative format for defining AI agents. Write your agent config once, run it anywhere. See the [spec](https://github.com/memgrafter/flatagents/blob/main/declarative-agent.d.ts).
+Python SDK for [FlatAgents](https://github.com/memgrafter/flatagents)—a format for defining AI agents. Write your agent config once, run it anywhere. See the [spec](https://github.com/memgrafter/flatagents/blob/main/flatagent.d.ts).
 
 ### In Progress
 
 - [ ] Unify input/output adapters for agent chaining
 - [ ] Simplify output adapters
-- [ ] Add declarative workflows (flatworkflows)
+- [ ] Add workflows (flatworkflows)
 - [ ] TypeScript SDK
 
 ## Why FlatAgents?
@@ -21,8 +21,8 @@ Define agents in YAML or JSON. Both formats are first-class.
 
 **agent.yml**
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: summarizer
@@ -40,8 +40,8 @@ data:
 **agent.json**
 ```json
 {
-  "spec": "declarative_agent",
-  "spec_version": "0.4.0",
+  "spec": "flatagent",
+  "spec_version": "0.5.0",
   "data": {
     "name": "summarizer",
     "model": {
@@ -61,9 +61,9 @@ data:
 ```
 
 ```python
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
-agent = DeclarativeAgent(config_file="agent.yml")  # or agent.json
+agent = FlatAgent(config_file="agent.yml")  # or agent.json
 result = await agent.execute(input={"text": "Long article here..."})
 print(result["summary"])
 ```
@@ -76,8 +76,8 @@ pip install flatagents[litellm]
 
 **writer.yaml**
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: writer
@@ -98,8 +98,8 @@ data:
 
 **critic.yaml**
 ```yaml
-spec: declarative_agent
-spec_version: "0.4.0"
+spec: flatagent
+spec_version: "0.5.0"
 
 data:
   name: critic
@@ -122,11 +122,11 @@ data:
 **run.py**
 ```python
 import asyncio
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 async def main():
-    writer = DeclarativeAgent(config_file="writer.yaml")
-    critic = DeclarativeAgent(config_file="critic.yaml")
+    writer = FlatAgent(config_file="writer.yaml")
+    critic = FlatAgent(config_file="critic.yaml")
 
     product = "a CLI tool for AI agents"
     draft = await writer.execute(input={"product": product})
@@ -154,11 +154,11 @@ python run.py
 ### From Dictionary
 
 ```python
-from flatagents import DeclarativeAgent
+from flatagents import FlatAgent
 
 config = {
-    "spec": "declarative_agent",
-    "spec_version": "0.4.0",
+    "spec": "flatagent",
+    "spec_version": "0.5.0",
     "data": {
         "name": "calculator",
         "model": {"provider": "openai", "name": "gpt-4"},
@@ -170,7 +170,7 @@ config = {
     }
 }
 
-agent = DeclarativeAgent(config_dict=config)
+agent = FlatAgent(config_dict=config)
 result = await agent.execute(input={"expression": "2 + 2"})
 ```
 
@@ -230,10 +230,10 @@ agent = MyAgent(backend=MyBackend())
 
 More examples are available in the [`examples/`](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples) directory:
 
-- **[declarativeagent_helloworld](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/declarativeagent_helloworld)** - Minimal getting started example
+- **[helloworld](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/helloworld)** - Minimal getting started example
 - **[writer_critic](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/writer_critic)** - Iterative refinement with two agents
-- **[declarative_mdap](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/declarative_mdap)** - Multi-step reasoning with calibrated confidence
-- **[declarative_gepa_self_optimizer](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/declarative_gepa_self_optimizer)** - Self-optimizing prompt evolution
+- **[mdap](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/mdap)** - Multi-step reasoning with calibrated confidence
+- **[gepa_self_optimizer](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/gepa_self_optimizer)** - Self-optimizing prompt evolution
 
 ## License
 

@@ -1,8 +1,8 @@
 """
-Declarative MDAP - MDAP framework with declarative agents.
+MDAP - MDAP framework with flatagents.
 
 This package provides a simplified MDAP implementation using
-declarative YAML-based agent configuration.
+YAML-based agent configuration.
 """
 
 from .mdap import MDAPOrchestrator, MDAPConfig, MDAPMetrics, create_orchestrator_from_config
