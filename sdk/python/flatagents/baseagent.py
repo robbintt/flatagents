@@ -450,6 +450,118 @@ class RegexExtractor:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# MCP Tool Provider Protocol and Types
+# ─────────────────────────────────────────────────────────────────────────────
+
+from dataclasses import dataclass, field
+
+
+@runtime_checkable
+class MCPToolProvider(Protocol):
+    """
+    Protocol for MCP tool providers.
+
+    Users implement this to connect their MCP backend (e.g., aisuite.mcp.MCPClient).
+    The SDK does not provide an implementation - users bring their own.
+
+    Example implementation using aisuite:
+
+        class AISuiteMCPProvider:
+            def __init__(self):
+                self._clients = {}
+
+            def connect(self, server_name: str, config: dict):
+                from aisuite.mcp import MCPClient
+                if server_name not in self._clients:
+                    self._clients[server_name] = MCPClient.from_config(config)
+
+            def get_tools(self, server_name: str) -> list:
+                return self._clients[server_name].list_tools()
+
+            def call_tool(self, server_name: str, tool_name: str, arguments: dict):
+                return self._clients[server_name].call_tool(tool_name, arguments)
+
+            def close(self):
+                for c in self._clients.values():
+                    c.close()
+    """
+
+    def connect(self, server_name: str, config: Dict[str, Any]) -> None:
+        """
+        Connect to an MCP server with the given configuration.
+
+        Args:
+            server_name: Identifier for this server (matches key in mcp.servers)
+            config: Server configuration (command/args for stdio, server_url for HTTP)
+        """
+        ...
+
+    def get_tools(self, server_name: str) -> List[Dict[str, Any]]:
+        """
+        Get available tools from an MCP server.
+
+        Args:
+            server_name: Server identifier
+
+        Returns:
+            List of tool definitions with 'name', 'description', 'inputSchema'
+        """
+        ...
+
+    def call_tool(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> Any:
+        """
+        Execute a tool call on an MCP server.
+
+        Args:
+            server_name: Server identifier
+            tool_name: Name of the tool to call
+            arguments: Tool arguments
+
+        Returns:
+            Tool execution result
+        """
+        ...
+
+    def close(self) -> None:
+        """Cleanup all server connections."""
+        ...
+
+
+@dataclass
+class ToolCall:
+    """
+    Represents a tool call request from the LLM.
+
+    Attributes:
+        id: Unique identifier for this tool call (from LLM response)
+        server: MCP server name (matches key in mcp.servers config)
+        tool: Tool name
+        arguments: Tool arguments as a dictionary
+    """
+    id: str
+    server: str
+    tool: str
+    arguments: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class AgentResponse:
+    """
+    Response from an agent call.
+
+    Attributes:
+        content: Raw text content from LLM (may be None if only tool calls)
+        output: Parsed output according to output schema (if defined)
+        tool_calls: List of tool calls requested by LLM (if any)
+        raw_response: Raw LLM response object for advanced use cases
+    """
+    content: Optional[str] = None
+    output: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[ToolCall]] = None
+    raw_response: Optional[Any] = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # FlatAgent Base Class
 # ─────────────────────────────────────────────────────────────────────────────
 

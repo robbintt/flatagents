@@ -4,12 +4,16 @@ FlatAgent - A single LLM call configured entirely via YAML or JSON.
 See flatagent.d.ts for the TypeScript type definition.
 
 An agent is a single LLM call: model + prompts + output schema.
+Optionally supports MCP (Model Context Protocol) for tool use.
 Workflows handle composition, branching, and loops.
 """
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from .baseagent import MCPToolProvider, AgentResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +32,10 @@ class FlatAgent:
     """
     A single LLM call configured entirely via YAML. No code required.
 
-    v0.5.0 Container format:
+    v0.6.0 Container format:
 
         spec: flatagent
-        spec_version: "0.5.0"
+        spec_version: "0.6.0"
 
         data:
           name: greeter
@@ -51,6 +55,20 @@ class FlatAgent:
               type: str
               description: "A friendly greeting message"
 
+          # Optional MCP configuration
+          mcp:
+            servers:
+              filesystem:
+                command: npx
+                args: ["-y", "@modelcontextprotocol/server-filesystem", "/docs"]
+            tool_filter:
+              allow: ["filesystem:read_file"]
+            tool_prompt: |
+              You have access to these tools:
+              {% for tool in tools %}
+              - {{ tool.name }}: {{ tool.description }}
+              {% endfor %}
+
         metadata:
           author: "your-name"
 
@@ -58,15 +76,28 @@ class FlatAgent:
         agent = FlatAgent(config_file="agent.yaml")
         result = await agent.call(name="Alice")
         print(result)  # {"greeting": "Hello, Alice!"}
+
+    Example with MCP:
+        from flatagents import FlatAgent, MCPToolProvider
+
+        agent = FlatAgent(config_file="agent.yaml")
+        provider = MyMCPProvider()  # User implements MCPToolProvider protocol
+        result = await agent.call(tool_provider=provider, question="List files")
+
+        if result.tool_calls:
+            for tc in result.tool_calls:
+                tool_result = provider.call_tool(tc.server, tc.tool, tc.arguments)
+                # Handle tool result...
     """
 
-    SPEC_VERSION = "0.5.0"
+    SPEC_VERSION = "0.6.0"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
     def __init__(
         self,
         config_file: Optional[str] = None,
         config_dict: Optional[Dict] = None,
+        tool_provider: Optional["MCPToolProvider"] = None,
         **kwargs
     ):
         if jinja2 is None:
@@ -77,6 +108,10 @@ class FlatAgent:
         self._load_config(config_file, config_dict, **kwargs)
         self._validate_spec()
         self._parse_agent_config()
+
+        # MCP support
+        self._tool_provider = tool_provider
+        self._tools_cache: Optional[List[Dict]] = None
 
         # Tracking
         self.total_cost = 0.0
@@ -90,7 +125,7 @@ class FlatAgent:
         config_dict: Optional[Dict],
         **kwargs
     ):
-        """Load v0.5.0 container config."""
+        """Load v0.6.0 container config."""
         import os
         try:
             import yaml
@@ -144,11 +179,11 @@ class FlatAgent:
             raise ValueError("Config missing 'data' section")
 
         spec_version = config.get('spec_version', '')
-        if not spec_version.startswith('0.5'):
+        if not (spec_version.startswith('0.5') or spec_version.startswith('0.6')):
             logger.warning(f"spec_version '{spec_version}' may not be fully compatible with {self.SPEC_VERSION}")
 
     def _parse_agent_config(self):
-        """Parse the v0.5.0 flatagent configuration."""
+        """Parse the v0.6.0 flatagent configuration."""
         data = self.config['data']
         self.metadata = self.config.get('metadata', {})
 
@@ -156,20 +191,228 @@ class FlatAgent:
         self.agent_name = data.get('name') or self.metadata.get('name', 'unnamed-agent')
 
         # Prompts
-        self._system_prompt = data.get('system', self.DEFAULT_SYSTEM_PROMPT)
+        self._system_prompt_template = data.get('system', self.DEFAULT_SYSTEM_PROMPT)
         self._user_prompt_template = data.get('user', '')
         self._instruction_suffix = data.get('instruction_suffix', '')
 
-        # Compile Jinja2 template (use default Undefined for optional template variables)
+        # Compile Jinja2 templates
         self._jinja_env = jinja2.Environment()
+        self._compiled_system = self._jinja_env.from_string(self._system_prompt_template)
         self._compiled_user = self._jinja_env.from_string(self._user_prompt_template)
 
         # Output schema (stored for reference, extraction uses json_object mode)
         self.output_schema = data.get('output', {})
 
-    def _render_user_prompt(self, input_data: Dict[str, Any]) -> str:
-        """Render user prompt with input data."""
-        prompt = self._compiled_user.render(input=input_data)
+        # MCP configuration
+        self.mcp_config = data.get('mcp')
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MCP Tool Support
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def set_tool_provider(self, provider: "MCPToolProvider") -> None:
+        """
+        Set the MCP tool provider.
+
+        Args:
+            provider: An object implementing the MCPToolProvider protocol
+        """
+        self._tool_provider = provider
+        self._tools_cache = None  # Clear cache when provider changes
+
+    def _discover_tools(self) -> List[Dict[str, Any]]:
+        """
+        Discover and filter tools from configured MCP servers.
+
+        Tools are cached for the lifetime of this agent instance.
+        Call set_tool_provider() to reset the cache.
+
+        Returns:
+            List of tool definitions with '_server' and '_qualified' metadata
+        """
+        if self._tools_cache is not None:
+            return self._tools_cache
+
+        if not self.mcp_config or not self._tool_provider:
+            return []
+
+        tools = []
+        servers = self.mcp_config.get('servers', {})
+        tool_filter = self.mcp_config.get('tool_filter', {})
+
+        for server_name, server_config in servers.items():
+            # Connect to server if not already connected
+            self._tool_provider.connect(server_name, server_config)
+
+            # Get tools from this server
+            try:
+                server_tools = self._tool_provider.get_tools(server_name)
+            except Exception as e:
+                logger.warning(f"Failed to get tools from server '{server_name}': {e}")
+                continue
+
+            for tool in server_tools:
+                qualified_name = f"{server_name}:{tool['name']}"
+                if self._passes_filter(qualified_name, tool_filter):
+                    tools.append({
+                        **tool,
+                        '_server': server_name,
+                        '_qualified': qualified_name
+                    })
+
+        self._tools_cache = tools
+        logger.info(f"Discovered {len(tools)} tools from {len(servers)} MCP server(s)")
+        return tools
+
+    def _passes_filter(self, qualified_name: str, filter_config: Dict) -> bool:
+        """
+        Check if a tool passes the allow/deny filters.
+
+        Args:
+            qualified_name: Tool name in "server:tool" format
+            filter_config: Dict with optional 'allow' and 'deny' lists
+
+        Returns:
+            True if tool should be included
+        """
+        allow = filter_config.get('allow', [])
+        deny = filter_config.get('deny', [])
+
+        # Deny takes precedence
+        for pattern in deny:
+            if self._match_pattern(qualified_name, pattern):
+                return False
+
+        # If allow list exists, must match at least one pattern
+        if allow:
+            return any(self._match_pattern(qualified_name, p) for p in allow)
+
+        # No allow list = allow all (that aren't denied)
+        return True
+
+    def _match_pattern(self, name: str, pattern: str) -> bool:
+        """
+        Match a qualified name against a pattern.
+
+        Supports:
+        - Exact match: "server:tool"
+        - Wildcard: "server:*" matches all tools from server
+
+        Args:
+            name: Qualified tool name ("server:tool")
+            pattern: Pattern to match against
+
+        Returns:
+            True if name matches pattern
+        """
+        if pattern.endswith(':*'):
+            return name.startswith(pattern[:-1])
+        return name == pattern
+
+    def _render_tool_prompt(self, tools: List[Dict]) -> str:
+        """
+        Render the tool_prompt template from the spec.
+
+        Args:
+            tools: List of discovered tool definitions
+
+        Returns:
+            Rendered tool prompt string, or empty string if no tools/template
+        """
+        if not tools or not self.mcp_config:
+            return ""
+
+        tool_prompt_template = self.mcp_config.get('tool_prompt', '')
+        if not tool_prompt_template:
+            return ""
+
+        template = self._jinja_env.from_string(tool_prompt_template)
+        return template.render(tools=tools)
+
+    def _convert_tools_for_llm(self, tools: List[Dict]) -> List[Dict]:
+        """
+        Convert MCP tool schemas to OpenAI function calling format.
+
+        Args:
+            tools: List of MCP tool definitions
+
+        Returns:
+            List of tools in OpenAI function format
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t['name'],
+                    "description": t.get('description', ''),
+                    "parameters": t.get('inputSchema', {"type": "object", "properties": {}})
+                }
+            }
+            for t in tools
+        ]
+
+    def _find_tool_server(self, tool_name: str, tools: List[Dict]) -> str:
+        """
+        Find which server a tool belongs to.
+
+        Args:
+            tool_name: Name of the tool
+            tools: List of discovered tools with '_server' metadata
+
+        Returns:
+            Server name, or empty string if not found
+        """
+        for tool in tools:
+            if tool['name'] == tool_name:
+                return tool.get('_server', '')
+        return ''
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Prompt Rendering
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _render_system_prompt(
+        self,
+        tools_prompt: str = "",
+        tools: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Render system prompt with optional tools context.
+
+        Args:
+            tools_prompt: Rendered tool prompt to inject
+            tools: List of tool definitions (available as {{ tools }})
+
+        Returns:
+            Rendered system prompt
+        """
+        return self._compiled_system.render(
+            tools_prompt=tools_prompt,
+            tools=tools or []
+        )
+
+    def _render_user_prompt(
+        self,
+        input_data: Dict[str, Any],
+        tools_prompt: str = "",
+        tools: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Render user prompt with input data and optional tools context.
+
+        Args:
+            input_data: Input values for {{ input.* }}
+            tools_prompt: Rendered tool prompt (available as {{ tools_prompt }})
+            tools: List of tool definitions (available as {{ tools }})
+
+        Returns:
+            Rendered user prompt
+        """
+        prompt = self._compiled_user.render(
+            input=input_data,
+            tools_prompt=tools_prompt,
+            tools=tools or []
+        )
         if self._instruction_suffix:
             prompt = f"{prompt}\n\n{self._instruction_suffix}"
         return prompt
@@ -195,39 +438,79 @@ class FlatAgent:
 
         return "Respond with JSON containing: " + ", ".join(fields)
 
-    async def call(self, **input_data) -> Dict[str, Any]:
+    # ─────────────────────────────────────────────────────────────────────────
+    # Execution
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def call(
+        self,
+        tool_provider: Optional["MCPToolProvider"] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
+        **input_data
+    ) -> "AgentResponse":
         """
         Execute a single LLM call with the given input.
 
         Args:
+            tool_provider: Optional MCPToolProvider (overrides constructor value)
+            messages: Optional conversation history (for tool call continuations)
             **input_data: Input values available as {{ input.* }} in templates
 
         Returns:
-            Dict with output fields as defined in the output schema
+            AgentResponse with content, output, and optionally tool_calls
         """
-        user_prompt = self._render_user_prompt(input_data)
+        from .baseagent import AgentResponse, ToolCall
 
-        # Add output instruction if we have a schema
-        output_instruction = self._build_output_instruction()
-        if output_instruction:
-            user_prompt = f"{user_prompt}\n\n{output_instruction}"
+        # Use provided tool provider or fall back to stored one
+        if tool_provider is not None:
+            self._tool_provider = tool_provider
+            self._tools_cache = None  # Clear cache
 
-        messages = [
-            {"role": "system", "content": self._system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        # Discover tools if MCP is configured
+        tools = self._discover_tools()
+        tools_prompt = self._render_tool_prompt(tools)
 
+        # Render prompts
+        system_prompt = self._render_system_prompt(tools_prompt=tools_prompt, tools=tools)
+        user_prompt = self._render_user_prompt(input_data, tools_prompt=tools_prompt, tools=tools)
+
+        # Add output instruction if we have a schema and no tools
+        # (with tools, the LLM may call tools instead of returning JSON)
+        if self.output_schema and not tools:
+            output_instruction = self._build_output_instruction()
+            if output_instruction:
+                user_prompt = f"{user_prompt}\n\n{output_instruction}"
+
+        # Build messages
+        if messages:
+            # Continue from provided message history
+            all_messages = [{"role": "system", "content": system_prompt}] + messages
+            # Only add user prompt if input_data was provided
+            if input_data:
+                all_messages.append({"role": "user", "content": user_prompt})
+        else:
+            all_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+        # Build LLM call parameters
         params = {
             "model": self.model,
-            "messages": messages,
+            "messages": all_messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }
 
-        # Use JSON mode if we have an output schema
-        if self.output_schema:
+        # Add tools if available
+        if tools:
+            params["tools"] = self._convert_tools_for_llm(tools)
+
+        # Use JSON mode if we have an output schema and no tools
+        if self.output_schema and not tools:
             params["response_format"] = {"type": "json_object"}
 
+        # Call LLM
         response = await litellm.acompletion(**params)
 
         # Track usage
@@ -237,19 +520,52 @@ class FlatAgent:
             output_tokens = getattr(response.usage, 'completion_tokens', 0)
             self.total_cost += (input_tokens * 0.001 + output_tokens * 0.002) / 1000
 
-        content = response.choices[0].message.content
+        # Extract response
+        message = response.choices[0].message
+        content = message.content
 
-        # Parse JSON response if we have an output schema
-        if self.output_schema and content:
+        # Parse output schema if applicable
+        output = None
+        if self.output_schema and content and not tools:
             try:
-                return json.loads(content)
+                output = json.loads(content)
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse JSON response: {content}")
-                return {"_raw": content}
+                output = {"_raw": content}
 
-        return {"_raw": content}
+        # Extract tool calls if present
+        tool_calls = None
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            tool_calls = []
+            for tc in message.tool_calls:
+                tool_name = tc.function.name
+                server = self._find_tool_server(tool_name, tools)
 
-    def call_sync(self, **input_data) -> Dict[str, Any]:
+                try:
+                    arguments = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    arguments = {}
+
+                tool_calls.append(ToolCall(
+                    id=tc.id,
+                    server=server,
+                    tool=tool_name,
+                    arguments=arguments
+                ))
+
+        return AgentResponse(
+            content=content,
+            output=output,
+            tool_calls=tool_calls,
+            raw_response=response
+        )
+
+    def call_sync(
+        self,
+        tool_provider: Optional["MCPToolProvider"] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
+        **input_data
+    ) -> "AgentResponse":
         """Synchronous wrapper for call()."""
         import asyncio
-        return asyncio.run(self.call(**input_data))
+        return asyncio.run(self.call(tool_provider=tool_provider, messages=messages, **input_data))

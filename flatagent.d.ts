@@ -1,5 +1,5 @@
 /**
- * FlatAgents Configuration Schema v0.5.0
+ * FlatAgents Configuration Schema v0.6.0
  * =============================================
  *
  * An agent is a single LLM call: model + prompts + output schema.
@@ -20,6 +20,13 @@
  * user               - User prompt template (Jinja2)
  * instruction_suffix - Optional instruction appended after user prompt
  * output             - Output schema (what fields we want)
+ * mcp                - Optional MCP (Model Context Protocol) configuration
+ *
+ * MCP FIELDS:
+ * -----------
+ * servers            - Map of server name to MCPServerDef
+ * tool_filter        - Optional allow/deny lists using "server:tool" format
+ * tool_prompt        - Jinja2 template for tool prompt (uses {{ tools }} variable)
  *
  * MODEL FIELDS:
  * -------------
@@ -81,6 +88,36 @@
  *   metadata:
  *     description: "Critiques draft answers"
  *     tags: ["reflection", "qa"]
+ *
+ * MCPCONFIG:
+ * ----------
+ * MCP (Model Context Protocol) configuration.
+ * Defines MCP servers and tool filtering rules.
+ *   servers     - MCP server definitions, keyed by server name
+ *   tool_filter - Optional tool filtering rules
+ *   tool_prompt - Jinja2 template for tool prompt injection.
+ *                 Available variables: tools (list of discovered tools)
+ *                 Example: "{% for tool in tools %}{{ tool.name }}: {{ tool.description }}{% endfor %}"
+ *
+ * MCPSERVERDEF:
+ * -------------
+ * MCP server definition.
+ * Supports stdio transport (command) or HTTP transport (server_url).
+ * Stdio transport:
+ *   command - Command to start the MCP server (e.g., "npx", "python")
+ *   args    - Arguments for the command
+ *   env     - Environment variables for the server process
+ * HTTP transport:
+ *   server_url - Base URL of the MCP server (e.g., "http://localhost:8000")
+ *   headers    - HTTP headers (e.g., for authentication)
+ *   timeout    - Request timeout in seconds
+ *
+ * TOOLFILTER:
+ * -----------
+ * Tool filtering rules using "server:tool" format.
+ * Supports wildcards: "server:*" matches all tools from a server.
+ *   allow - Tools to allow (if specified, only these are included)
+ *   deny  - Tools to deny (takes precedence over allow)
  */
 
 export interface AgentWrapper {
@@ -97,6 +134,27 @@ export interface AgentData {
   user: string;
   instruction_suffix?: string;
   output?: OutputSchema;
+  mcp?: MCPConfig;
+}
+
+export interface MCPConfig {
+  servers: Record<string, MCPServerDef>;
+  tool_filter?: ToolFilter;
+  tool_prompt: string;
+}
+
+export interface MCPServerDef {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  server_url?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+}
+
+export interface ToolFilter {
+  allow?: string[];
+  deny?: string[];
 }
 
 export interface ModelConfig {
