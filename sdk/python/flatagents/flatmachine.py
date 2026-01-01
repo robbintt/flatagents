@@ -136,6 +136,13 @@ class FlatMachine:
                 f"Current SDK supports 0.1.x."
             )
 
+        # Schema validation (warnings only, non-blocking)
+        try:
+            from .validation import validate_flatmachine_config
+            validate_flatmachine_config(self.config, warn=True, strict=False)
+        except ImportError:
+            pass  # jsonschema not installed, skip validation
+
     def _parse_machine_config(self) -> None:
         """Parse the machine configuration."""
         self.data = self.config['data']

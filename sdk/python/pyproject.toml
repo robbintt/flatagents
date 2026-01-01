@@ -30,7 +30,8 @@ dependencies = ["pyyaml", "jinja2"]
 litellm = ["litellm"]
 aisuite = ["aisuite[all]"]
 cel = ["cel-python"]
-all = ["litellm", "aisuite[all]", "cel-python"]
+validation = ["jsonschema>=4.0"]
+all = ["litellm", "aisuite[all]", "cel-python", "jsonschema>=4.0"]
 
 [project.urls]
 Homepage = "https://github.com/memgrafter/flatagents"
@@ -39,3 +40,7 @@ Issues = "https://github.com/memgrafter/flatagents/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["flatagents"]
+artifacts = [
+    "flatagents/assets/*.d.ts",
+    "flatagents/assets/*.json",
+]

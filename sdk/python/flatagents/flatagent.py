@@ -287,6 +287,13 @@ class FlatAgent:
                 f"Current SDK supports 0.5.x - 0.6.x."
             )
 
+        # Schema validation (warnings only, non-blocking)
+        try:
+            from .validation import validate_flatagent_config
+            validate_flatagent_config(config, warn=True, strict=False)
+        except ImportError:
+            pass  # jsonschema not installed, skip validation
+
     def _parse_agent_config(self):
         """Parse the v0.6.0 flatagent configuration."""
         data = self.config['data']

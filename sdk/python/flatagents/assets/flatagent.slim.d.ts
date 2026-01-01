@@ -1,0 +1,51 @@
+export interface AgentWrapper {
+    spec: "flatagent";
+    spec_version: string;
+    data: AgentData;
+    metadata?: Record<string, any>;
+}
+export interface AgentData {
+    name?: string;
+    model: ModelConfig;
+    system: string;
+    user: string;
+    instruction_suffix?: string;
+    output?: OutputSchema;
+    mcp?: MCPConfig;
+}
+export interface MCPConfig {
+    servers: Record<string, MCPServerDef>;
+    tool_filter?: ToolFilter;
+    tool_prompt: string;
+}
+export interface MCPServerDef {
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    server_url?: string;
+    headers?: Record<string, string>;
+    timeout?: number;
+}
+export interface ToolFilter {
+    allow?: string[];
+    deny?: string[];
+}
+export interface ModelConfig {
+    name: string;
+    provider?: string;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+}
+export type OutputSchema = Record<string, OutputFieldDef>;
+export interface OutputFieldDef {
+    type: "str" | "int" | "float" | "bool" | "json" | "list" | "object";
+    description?: string;
+    enum?: string[];
+    required?: boolean;
+    items?: OutputFieldDef;
+    properties?: OutputSchema;
+}
+export type FlatagentsConfig = AgentWrapper;

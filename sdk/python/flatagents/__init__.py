@@ -36,6 +36,14 @@ from .execution import (
     MDAPVotingExecution,
     get_execution_type,
 )
+from .validation import (
+    validate_flatagent_config,
+    validate_flatmachine_config,
+    get_flatagent_schema,
+    get_flatmachine_schema,
+    get_asset_path,
+    ValidationWarning,
+)
 
 __all__ = [
     "__version__",
@@ -75,4 +83,11 @@ __all__ = [
     "MCPToolProvider",
     "ToolCall",
     "AgentResponse",
+    # Validation
+    "validate_flatagent_config",
+    "validate_flatmachine_config",
+    "get_flatagent_schema",
+    "get_flatmachine_schema",
+    "get_asset_path",
+    "ValidationWarning",
 ]

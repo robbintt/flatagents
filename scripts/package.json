@@ -1,0 +1,14 @@
+{
+  "name": "flatagents-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate-spec-assets": "tsx generate-spec-assets.ts"
+  },
+  "devDependencies": {
+    "ts-json-schema-generator": "^2.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
