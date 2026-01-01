@@ -278,9 +278,14 @@ class FlatAgent:
         if 'data' not in config:
             raise ValueError("Config missing 'data' section")
 
-        spec_version = config.get('spec_version', '')
-        if not (spec_version.startswith('0.5') or spec_version.startswith('0.6')):
-            logger.warning(f"spec_version '{spec_version}' may not be fully compatible with {self.SPEC_VERSION}")
+        # Version check with warning
+        self.spec_version = config.get('spec_version', '0.6.0')
+        major_minor = '.'.join(self.spec_version.split('.')[:2])
+        if major_minor not in ['0.5', '0.6']:
+            logger.warning(
+                f"Config version {self.spec_version} may not be fully supported. "
+                f"Current SDK supports 0.5.x - 0.6.x."
+            )
 
     def _parse_agent_config(self):
         """Parse the v0.6.0 flatagent configuration."""
@@ -473,13 +478,15 @@ class FlatAgent:
 
     def _render_system_prompt(
         self,
+        input_data: Dict[str, Any],
         tools_prompt: str = "",
         tools: Optional[List[Dict]] = None
     ) -> str:
         """
-        Render system prompt with optional tools context.
+        Render system prompt with input data and optional tools context.
 
         Args:
+            input_data: Input values for {{ input.* }}
             tools_prompt: Rendered tool prompt to inject
             tools: List of tool definitions (available as {{ tools }})
 
@@ -494,6 +501,7 @@ class FlatAgent:
             "max_tokens": self.max_tokens,
         }
         return self._compiled_system.render(
+            input=input_data,
             tools_prompt=tools_prompt,
             tools=tools or [],
             model=model_config
@@ -587,7 +595,7 @@ class FlatAgent:
         tools_prompt = self._render_tool_prompt(tools)
 
         # Render prompts
-        system_prompt = self._render_system_prompt(tools_prompt=tools_prompt, tools=tools)
+        system_prompt = self._render_system_prompt(input_data, tools_prompt=tools_prompt, tools=tools)
         user_prompt = self._render_user_prompt(input_data, tools_prompt=tools_prompt, tools=tools)
 
         # Add output instruction if we have a schema and no tools

@@ -20,6 +20,22 @@ from .baseagent import (
     AgentResponse,
 )
 from .flatagent import FlatAgent
+from .flatmachine import FlatMachine
+from .hooks import (
+    MachineHooks,
+    LoggingHooks,
+    MetricsHooks,
+    CompositeHooks,
+)
+from .expressions import get_expression_engine, ExpressionEngine
+from .execution import (
+    ExecutionType,
+    DefaultExecution,
+    ParallelExecution,
+    RetryExecution,
+    MDAPVotingExecution,
+    get_execution_type,
+)
 
 __all__ = [
     "__version__",
@@ -27,6 +43,23 @@ __all__ = [
     "FlatAgent",
     # Base agent for custom multi-step agents
     "BaseFlatAgent",
+    # State machine orchestration
+    "FlatMachine",
+    # Machine hooks
+    "MachineHooks",
+    "LoggingHooks",
+    "MetricsHooks",
+    "CompositeHooks",
+    # Expression engines
+    "ExpressionEngine",
+    "get_expression_engine",
+    # Execution types
+    "ExecutionType",
+    "DefaultExecution",
+    "ParallelExecution",
+    "RetryExecution",
+    "MDAPVotingExecution",
+    "get_execution_type",
     # LLM Backends
     "LLMBackend",
     "LiteLLMBackend",

@@ -1,8 +1,8 @@
 [project]
-name = "mcp_exa"
+name = "error_handling"
 version = "0.1.0"
-description = "MCP Exa demo for FlatAgent - web search with MCP tools."
-dependencies = ["flatagents[litellm]", "aisuite[mcp]"]
+description = "Error handling demo with cleanup agent."
+dependencies = ["flatagents[litellm]"]
 requires-python = ">=3.10"
 
 [build-system]
@@ -13,4 +13,4 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [project.scripts]
-mcp-exa-demo = "mcp_exa.main:main"
+error-handling-demo = "error_handling.main:main"
