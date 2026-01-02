@@ -10,8 +10,8 @@ echo ""
 
 # Extract versions from root TypeScript specs
 echo "Extracting spec versions from TypeScript files..."
-FLATAGENT_VERSION=$(npx tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatagent.d.ts")
-FLATMACHINE_VERSION=$(npx tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatmachine.d.ts")
+FLATAGENT_VERSION=$(npx -y tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatagent.d.ts")
+FLATMACHINE_VERSION=$(npx -y tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatmachine.d.ts")
 
 echo "TypeScript spec versions:"
 echo "  flatagent.d.ts:   $FLATAGENT_VERSION"
