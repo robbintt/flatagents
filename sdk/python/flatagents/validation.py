@@ -7,13 +7,11 @@ Validation errors are warnings by default to avoid breaking user configs.
 
 import json
 import warnings
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from importlib.resources import files
+from typing import Any, Dict, List, Optional, Union
 
-# Bundled schema paths
-ASSETS_DIR = Path(__file__).parent / "assets"
-FLATAGENT_SCHEMA = ASSETS_DIR / "flatagent.schema.json"
-FLATMACHINE_SCHEMA = ASSETS_DIR / "flatmachine.schema.json"
+# Package containing bundled assets
+_ASSETS = files("flatagents.assets")
 
 
 class ValidationWarning(UserWarning):
@@ -21,12 +19,13 @@ class ValidationWarning(UserWarning):
     pass
 
 
-def _load_schema(schema_path: Path) -> Optional[Dict[str, Any]]:
-    """Load a JSON schema from file."""
-    if not schema_path.exists():
+def _load_schema(filename: str) -> Optional[Dict[str, Any]]:
+    """Load a JSON schema from bundled assets."""
+    try:
+        content = (_ASSETS / filename).read_text()
+        return json.loads(content)
+    except FileNotFoundError:
         return None
-    with open(schema_path) as f:
-        return json.load(f)
 
 
 def _validate_with_jsonschema(config: Dict[str, Any], schema: Dict[str, Any]) -> List[str]:
@@ -60,7 +59,7 @@ def validate_flatagent_config(
     Returns:
         List of validation error messages (empty if valid)
     """
-    schema = _load_schema(FLATAGENT_SCHEMA)
+    schema = _load_schema("flatagent.schema.json")
     if schema is None:
         return []  # Schema not bundled, skip validation
 
@@ -99,7 +98,7 @@ def validate_flatmachine_config(
     Returns:
         List of validation error messages (empty if valid)
     """
-    schema = _load_schema(FLATMACHINE_SCHEMA)
+    schema = _load_schema("flatmachine.schema.json")
     if schema is None:
         return []  # Schema not bundled, skip validation
 
@@ -124,15 +123,19 @@ def validate_flatmachine_config(
 
 def get_flatagent_schema() -> Optional[Dict[str, Any]]:
     """Get the bundled flatagent JSON schema."""
-    return _load_schema(FLATAGENT_SCHEMA)
+    return _load_schema("flatagent.schema.json")
 
 
 def get_flatmachine_schema() -> Optional[Dict[str, Any]]:
     """Get the bundled flatmachine JSON schema."""
-    return _load_schema(FLATMACHINE_SCHEMA)
+    return _load_schema("flatmachine.schema.json")
 
 
-def get_asset_path(filename: str) -> Optional[Path]:
-    """Get the path to a bundled asset file."""
-    path = ASSETS_DIR / filename
-    return path if path.exists() else None
+def get_asset(filename: str) -> str:
+    """Get the contents of a bundled asset file."""
+    return (_ASSETS / filename).read_text()
+
+
+def _get_asset_path(filename: str):
+    """Internal: Get a Traversable for a bundled asset file."""
+    return _ASSETS / filename

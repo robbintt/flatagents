@@ -41,7 +41,7 @@ from .validation import (
     validate_flatmachine_config,
     get_flatagent_schema,
     get_flatmachine_schema,
-    get_asset_path,
+    get_asset,
     ValidationWarning,
 )
 
@@ -88,6 +88,6 @@ __all__ = [
     "validate_flatmachine_config",
     "get_flatagent_schema",
     "get_flatmachine_schema",
-    "get_asset_path",
+    "get_asset",
     "ValidationWarning",
 ]
