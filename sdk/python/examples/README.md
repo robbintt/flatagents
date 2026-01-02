@@ -58,8 +58,17 @@ example-name-demo = "example_name.main:main"
 #!/bin/bash
 set -e
 
-PROJECT_NAME="example_name"
-VENV_PATH="$HOME/virtualenvs/$PROJECT_NAME"
+VENV_PATH=".venv"
+
+# Parse arguments
+LOCAL_INSTALL=false
+PASSTHROUGH_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --local|-l) LOCAL_INSTALL=true; shift ;;
+        *) PASSTHROUGH_ARGS+=("$1"); shift ;;
+    esac
+done
 
 echo "--- Example Name Demo Runner ---"
 
@@ -67,17 +76,20 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
 # Create venv
-mkdir -p "$(dirname "$VENV_PATH")"
 if [ ! -d "$VENV_PATH" ]; then
     uv venv "$VENV_PATH"
 fi
 
-# Install
-uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../..[litellm]"
+# Install (PyPI by default, local with --local flag)
+if [ "$LOCAL_INSTALL" = true ]; then
+    uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../..[litellm]"
+else
+    uv pip install --python "$VENV_PATH/bin/python" "flatagents[litellm]"
+fi
 uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR"
 
 # Run
-"$VENV_PATH/bin/python" -m example_name.main "$@"
+"$VENV_PATH/bin/python" -m example_name.main "${PASSTHROUGH_ARGS[@]}"
 ```
 
 **Important:** Run `chmod +x run.sh` after creating.
@@ -117,13 +129,14 @@ Usage:
 """
 
 import asyncio
-import logging
 from pathlib import Path
 
-from flatagents import FlatMachine, LoggingHooks
+from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
 # from .hooks import CustomHooks  # If using custom hooks
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+setup_logging(level="INFO")
+logger = get_logger(__name__)
 
 
 async def run():
@@ -132,8 +145,8 @@ async def run():
     
     result = await machine.execute(input={...})
     
-    print(f"Result: {result}")
-    print(f"API calls: {machine.total_api_calls}, Cost: ${machine.total_cost:.4f}")
+    logger.info(f"Result: {result}")
+    logger.info(f"API calls: {machine.total_api_calls}, Cost: ${machine.total_cost:.4f}")
     return result
 
 
