@@ -1,25 +1,20 @@
 # FlatAgents Python SDK
 
-**Status: Prototype**
+Python SDK for [FlatAgents](https://github.com/memgrafter/flatagents)—YAML-configured AI agents and state machine orchestration.
 
-Python SDK for [FlatAgents](https://github.com/memgrafter/flatagents)—a format for defining AI agents. Write your agent config once, run it anywhere. See the [spec](https://github.com/memgrafter/flatagents/blob/main/flatagent.d.ts).
+LLM/machine readers: use MACHINES.md as a primary reference, it is more comprehensive and token efficient.
 
-### In Progress
+## Install
 
-- [ ] Unify input/output adapters for agent chaining
-- [ ] Simplify output adapters
-- [ ] Add workflows (flatworkflows)
-- [ ] TypeScript SDK
+```bash
+pip install flatagents[litellm]
+```
 
-## Why FlatAgents?
+## Quick Start
 
-Agent configs are portable. Write your agent YAML once, run it with any SDK that implements the spec. Share agents across teams, languages, and frameworks. Want an SDK for your language? [Build one](https://github.com/memgrafter/flatagents)—the spec is simple.
+### Single Agent
 
-## Agent Definition
-
-Define agents in YAML or JSON. Both formats are first-class.
-
-**agent.yml**
+**summarizer.yml**
 ```yaml
 spec: flatagent
 spec_version: "0.6.0"
@@ -30,221 +25,151 @@ data:
     provider: openai
     name: gpt-4o-mini
   system: You summarize text concisely.
-  user: "Summarize this: {{ input.text }}"
+  user: "Summarize: {{ input.text }}"
   output:
     summary:
       type: str
       description: A concise summary
 ```
 
-**agent.json**
-```json
-{
-  "spec": "flatagent",
-  "spec_version": "0.6.0",
-  "data": {
-    "name": "summarizer",
-    "model": {
-      "provider": "openai",
-      "name": "gpt-4o-mini"
-    },
-    "system": "You summarize text concisely.",
-    "user": "Summarize this: {{ input.text }}",
-    "output": {
-      "summary": {
-        "type": "str",
-        "description": "A concise summary"
-      }
-    }
-  }
-}
-```
-
 ```python
 from flatagents import FlatAgent
 
-agent = FlatAgent(config_file="agent.yml")  # or agent.json
-result = await agent.execute(input={"text": "Long article here..."})
+agent = FlatAgent(config_file="summarizer.yml")
+result = await agent.execute(input={"text": "Long article..."})
 print(result["summary"])
 ```
 
-## Quick Start
+### State Machine
 
-```bash
-pip install flatagents[litellm]
-```
-
-**writer.yaml**
+**machine.yml**
 ```yaml
-spec: flatagent
-spec_version: "0.6.0"
+spec: flatmachine
+spec_version: "0.1.0"
 
 data:
-  name: writer
-  model:
-    provider: openai
-    name: gpt-4o-mini
-  system: You write short, punchy marketing copy.
-  user: |
-    Product: {{ input.product }}
-    {% if input.feedback %}Previous attempt: {{ input.tagline }}
-    Feedback: {{ input.feedback }}
-    Write an improved tagline.{% else %}Write a tagline.{% endif %}
-  output:
-    tagline:
-      type: str
-      description: The tagline
+  name: writer-critic
+  context:
+    product: "{{ input.product }}"
+    score: 0
+  agents:
+    writer: ./writer.yml
+    critic: ./critic.yml
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: write
+    write:
+      agent: writer
+      output_to_context:
+        tagline: "{{ output.tagline }}"
+      transitions:
+        - to: review
+    review:
+      agent: critic
+      output_to_context:
+        score: "{{ output.score }}"
+      transitions:
+        - condition: "context.score >= 8"
+          to: done
+        - to: write
+    done:
+      type: final
+      output:
+        tagline: "{{ context.tagline }}"
 ```
-
-**critic.yaml**
-```yaml
-spec: flatagent
-spec_version: "0.6.0"
-
-data:
-  name: critic
-  model:
-    provider: openai
-    name: gpt-4o-mini
-  system: You critique marketing copy. Be constructive but direct.
-  user: |
-    Product: {{ input.product }}
-    Tagline: {{ input.tagline }}
-  output:
-    feedback:
-      type: str
-      description: Constructive feedback
-    score:
-      type: int
-      description: Score from 1-10
-```
-
-**run.py**
-```python
-import asyncio
-from flatagents import FlatAgent
-
-async def main():
-    writer = FlatAgent(config_file="writer.yaml")
-    critic = FlatAgent(config_file="critic.yaml")
-
-    product = "a CLI tool for AI agents"
-    draft = await writer.execute(input={"product": product})
-
-    for round in range(4):
-        review = await critic.execute(input={"product": product, **draft})
-        print(f"Round {round + 1}: \"{draft['tagline']}\" - {review['score']}/10")
-
-        if review["score"] >= 8:
-            break
-        draft = await writer.execute(input={"product": product, **review, **draft})
-
-    print(f"Final: {draft['tagline']}")
-
-asyncio.run(main())
-```
-
-```bash
-export OPENAI_API_KEY="your-key"
-python run.py
-```
-
-## Usage
-
-### From Dictionary
 
 ```python
-from flatagents import FlatAgent
+from flatagents import FlatMachine
 
-config = {
-    "spec": "flatagent",
-    "spec_version": "0.6.0",
-    "data": {
-        "name": "calculator",
-        "model": {"provider": "openai", "name": "gpt-4"},
-        "system": "You are a calculator.",
-        "user": "Calculate: {{ input.expression }}",
-        "output": {
-            "result": {"type": "float", "description": "The calculated result"}
-        }
-    }
-}
-
-agent = FlatAgent(config_dict=config)
-result = await agent.execute(input={"expression": "2 + 2"})
+machine = FlatMachine(config_file="machine.yml")
+result = await machine.execute(input={"product": "AI coding assistant"})
+print(result["tagline"])
 ```
 
-### Custom Agent (Subclass FlatAgent)
+## Configuration
 
-```python
-from flatagents import FlatAgent
-
-class MyAgent(FlatAgent):
-    def create_initial_state(self):
-        return {"count": 0}
-
-    def generate_step_prompt(self, state):
-        return f"Count is {state['count']}. What's next?"
-
-    def update_state(self, state, result):
-        return {**state, "count": int(result)}
-
-    def is_solved(self, state):
-        return state["count"] >= 10
-
-agent = MyAgent(config_file="config.yaml")
-trace = await agent.execute()
-```
+Both YAML and JSON configs are supported. Pass `config_file` for file-based configs or `config_dict` for inline configs.
 
 ## LLM Backends
-
-Two backends available:
 
 ```python
 from flatagents import LiteLLMBackend, AISuiteBackend
 
-# LiteLLM - model format: provider/model
-backend = LiteLLMBackend(model="openai/gpt-4o", temperature=0.7)
+# LiteLLM (default)
+agent = FlatAgent(config_file="agent.yml")
 
-# AISuite - model format: provider:model
-backend = AISuiteBackend(model="openai:gpt-4o", temperature=0.7)
+# AISuite
+backend = AISuiteBackend(model="openai:gpt-4o")
+agent = FlatAgent(config_file="agent.yml", backend=backend)
 ```
 
-### Custom Backend
+## Hooks
 
-Implement the `LLMBackend` protocol:
+Extend machine behavior with Python hooks:
 
 ```python
-class MyBackend:
-    total_cost: float = 0.0
-    total_api_calls: int = 0
+from flatagents import FlatMachine, MachineHooks
 
-    async def call(self, messages: list, **kwargs) -> str:
-        self.total_api_calls += 1
-        return "response"
+class CustomHooks(MachineHooks):
+    def on_state_enter(self, state: str, context: dict) -> dict:
+        context["entered_at"] = time.time()
+        return context
 
-agent = MyAgent(backend=MyBackend())
+    def on_action(self, action: str, context: dict) -> dict:
+        if action == "fetch_data":
+            context["data"] = fetch_from_api()
+        return context
+
+machine = FlatMachine(config_file="machine.yml", hooks=CustomHooks())
+```
+
+**Available hooks**: `on_machine_start`, `on_machine_end`, `on_state_enter`, `on_state_exit`, `on_transition`, `on_error`, `on_action`
+
+**Built-in hooks**: `LoggingHooks`, `MetricsHooks`, `CompositeHooks`
+
+## Execution Types
+
+Configure how agents are executed in machine states:
+
+```yaml
+execution:
+  type: retry              # retry | parallel | mdap_voting
+  backoffs: [2, 8, 16, 35] # Seconds between retries
+  jitter: 0.1              # ±10% random variation
+```
+
+| Type | Use Case |
+|------|----------|
+| `default` | Single call |
+| `retry` | Rate limit handling with backoff |
+| `parallel` | Multiple samples (`n_samples`) |
+| `mdap_voting` | Consensus voting (`k_margin`, `max_candidates`) |
+
+## Schema Validation
+
+```python
+from flatagents import validate_flatagent_config, validate_flatmachine_config
+
+# Returns list of warnings/errors
+warnings = validate_flatagent_config(config)
+warnings = validate_flatmachine_config(config)
 ```
 
 ## Examples
 
-More examples are available in the [`examples/`](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples) directory:
+- **[helloworld](examples/helloworld)** — Minimal getting started
+- **[writer_critic](examples/writer_critic)** — Iterative refinement loop
+- **[mdap](examples/mdap)** — Multi-step reasoning with calibrated confidence
+- **[error_handling](examples/error_handling)** — Error recovery patterns
 
-- **[helloworld](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/helloworld)** - Minimal getting started example
-- **[writer_critic](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/writer_critic)** - Iterative refinement with two agents
-- **[mdap](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/mdap)** - Multi-step reasoning with calibrated confidence
-- **[gepa_self_optimizer](https://github.com/memgrafter/flatagents/tree/main/sdk/python/examples/gepa_self_optimizer)** - Self-optimizing prompt evolution
+## Specs
 
-## Known Issues
+See [`flatagent.d.ts`](../../flatagent.d.ts) and [`flatmachine.d.ts`](../../flatmachine.d.ts) for full specifications.
 
-### aisuite drops tools from API calls
-
-When using the aisuite backend with tool calling (MCP), tools are silently dropped from the API request unless `max_turns` is set. This is a bug in aisuite's `client.chat.completions.create()` which pops the `tools` kwarg.
-
-**Workaround:** The SDK includes a direct provider call for Cerebras that bypasses aisuite's client. See `_call_aisuite_cerebras_direct()` in `flatagent.py`. Other providers may need similar workarounds until aisuite fixes this upstream.
-
-**Symptoms:** Model outputs tool call JSON in text content instead of using actual tool calling mechanism. Agent completes immediately with "no tool calls" when tools should have been invoked.
+See [MACHINES.md](MACHINES.md) for state machine patterns and reference.
 
 ## License
 
-MIT License - see [LICENSE](../../LICENSE) for details.
+MIT — see [LICENSE](../../LICENSE)
