@@ -1,5 +1,7 @@
 # FlatAgents
 
+LLM/machine readers: use MACHINES.md as a primary reference, it is more comprehensive and token efficient.
+
 A specification for LLM-powered agents. Define agents in YAML/JSON, run them anywhere.
 
 - **Orchestrate via code or existing orchestration** - FlatAgents defines single agents, not workflows. Compose them using your language of choice or plug into existing orchestration frameworks.
