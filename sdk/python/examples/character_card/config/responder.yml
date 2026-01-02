@@ -1,0 +1,84 @@
+# Character Responder Agent
+# Responds as the character based on card data
+# System prompt follows SillyTavern chat completion format
+
+spec: flatagent
+spec_version: "0.6.0"
+
+data:
+  name: character-responder
+  
+  model:
+    provider: cerebras
+    name: zai-glm-4.6
+    temperature: 0.6
+  
+  # SillyTavern-compatible system prompt format
+  system: |
+    {% if input.no_system_prompt %}
+    {# Empty - system content moved to first user message #}
+    {% else %}
+    {% if input.card_system_prompt %}
+    {{ input.card_system_prompt }}
+    {% else %}
+    Write {{ input.card_name }}'s next reply in a fictional chat between {{ input.card_name }} and {{ input.user_name }}.
+    {% endif %}
+    
+    {% if input.card_description %}
+    [{{ input.card_name }}'s Description: {{ input.card_description }}]
+    {% endif %}
+    {% if input.card_personality %}
+    [{{ input.card_name }}'s Personality: {{ input.card_personality }}]
+    {% endif %}
+    {% if input.card_scenario %}
+    [Scenario: {{ input.card_scenario }}]
+    {% endif %}
+    {% if input.user_persona %}
+    [{{ input.user_name }}'s Persona: {{ input.user_persona }}]
+    {% endif %}
+    {% if input.card_mes_example %}
+    [Example Dialogue:
+    {{ input.card_mes_example }}]
+    {% endif %}
+    {% endif %}
+  
+  user: |
+    {% if input.no_system_prompt %}
+    {% if input.card_system_prompt %}
+    {{ input.card_system_prompt }}
+    {% else %}
+    Write {{ input.card_name }}'s next reply in a fictional chat between {{ input.card_name }} and {{ input.user_name }}.
+    {% endif %}
+    
+    {% if input.card_description %}
+    [{{ input.card_name }}'s Description: {{ input.card_description }}]
+    {% endif %}
+    {% if input.card_personality %}
+    [{{ input.card_name }}'s Personality: {{ input.card_personality }}]
+    {% endif %}
+    {% if input.card_scenario %}
+    [Scenario: {{ input.card_scenario }}]
+    {% endif %}
+    {% if input.user_persona %}
+    [{{ input.user_name }}'s Persona: {{ input.user_persona }}]
+    {% endif %}
+    {% if input.card_mes_example %}
+    [Example Dialogue:
+    {{ input.card_mes_example }}]
+    {% endif %}
+    ---
+    {% endif %}
+    {% for msg in input.messages %}
+    {% if msg.role == 'user' %}{{ input.user_name }}: {{ msg.content }}{% else %}{{ input.card_name }}: {{ msg.content }}{% endif %}
+    {% endfor %}
+    {{ input.user_name }}: {{ input.user_message }}{% if input.post_history_instructions %}
+
+    System: {{ input.post_history_instructions }}{% endif %}
+  
+  output:
+    response:
+      type: str
+      description: The character's response to the user
+
+metadata:
+  description: "SillyTavern-compatible character responder with user persona support"

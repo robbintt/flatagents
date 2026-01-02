@@ -2,6 +2,15 @@
 
 Guide for creating new flatagents examples.
 
+## Important: Spec Versions
+
+**Always check the spec files at the repo root for current versions:**
+
+- [`flatagent.d.ts`](../../flatagent.d.ts) — FlatAgent schema and current `spec_version`
+- [`flatmachine.d.ts`](../../flatmachine.d.ts) — FlatMachine schema and current `spec_version`
+
+Use the latest `spec_version` from these files when creating new examples.
+
 ## Required Structure
 
 ```
@@ -140,7 +149,7 @@ if __name__ == "__main__":
 
 ```yaml
 spec: flatmachine
-spec_version: "0.1.0"
+spec_version: "X.X.X"  # Check flatmachine.d.ts for current version
 
 data:
   name: example-name
@@ -179,7 +188,7 @@ metadata:
 
 ```yaml
 spec: flatagent
-spec_version: "0.1.0"
+spec_version: "X.X.X"  # Check flatagent.d.ts for current version
 
 data:
   name: agent-name
@@ -189,18 +198,16 @@ data:
     name: zai-glm-4.6
     temperature: 0.6
   
-  system_prompt: |
+  system: |
     System instructions here.
   
-  user_prompt: |
-    User prompt with {{ variable }} templating.
+  user: |
+    User prompt with {{ input.variable }} templating.
   
-  output_schema:
-    type: object
-    properties:
-      result:
-        type: string
-    required: [result]
+  output:
+    result:
+      type: str
+      description: Brief description
 
 metadata:
   description: "Brief description"

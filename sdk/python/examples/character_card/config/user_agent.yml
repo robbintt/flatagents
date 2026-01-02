@@ -1,0 +1,43 @@
+# User Agent
+# LLM-driven user that generates responses in character chats
+
+spec: flatagent
+spec_version: "0.6.0"
+
+data:
+  name: user-agent
+  
+  model:
+    provider: cerebras
+    name: zai-glm-4.6
+    temperature: 0.6
+  
+  system: |
+    You are roleplaying as {{ input.user_name }} in a conversation with {{ input.card_name }}.
+    {% if input.user_persona %}
+    Your persona: {{ input.user_persona }}
+    {% endif %}
+    
+    Respond naturally as {{ input.user_name }} would. Be engaging and keep the conversation going.
+    Write only your response, no narration or stage directions unless that fits your persona.
+  
+  user: |
+    Character you're talking to: {{ input.card_name }}
+    {% if input.card_description %}
+    Their description: {{ input.card_description }}
+    {% endif %}
+    
+    Conversation so far:
+    {% for msg in input.messages %}
+    {% if msg.role == 'user' %}{{ input.user_name }}: {{ msg.content }}{% else %}{{ input.card_name }}: {{ msg.content }}{% endif %}
+    {% endfor %}
+    
+    Write {{ input.user_name }}'s next response:
+  
+  output:
+    response:
+      type: str
+      description: The user's response
+
+metadata:
+  description: "LLM-driven user agent for automated chat"
