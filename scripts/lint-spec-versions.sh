@@ -74,6 +74,28 @@ done < <(rg 'spec_version' --type yaml --type json -l)
 # Report results
 TOTAL_MISMATCHES=$((${#FLATAGENT_MISMATCHES[@]} + ${#FLATMACHINE_MISMATCHES[@]}))
 
+# Also check Python SDK SPEC_VERSION constants
+PYTHON_MISMATCHES=()
+
+PYTHON_FLATAGENT="$REPO_ROOT/sdk/python/flatagents/flatagent.py"
+PYTHON_FLATMACHINE="$REPO_ROOT/sdk/python/flatagents/flatmachine.py"
+
+if [[ -f "$PYTHON_FLATAGENT" ]]; then
+    PY_AGENT_VERSION=$(rg 'SPEC_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"' "$PYTHON_FLATAGENT" -o -r '$1' --no-heading | head -1)
+    if [[ -n "$PY_AGENT_VERSION" && "$PY_AGENT_VERSION" != "$FLATAGENT_VERSION" ]]; then
+        PYTHON_MISMATCHES+=("$PYTHON_FLATAGENT: $PY_AGENT_VERSION (should be $FLATAGENT_VERSION)")
+    fi
+fi
+
+if [[ -f "$PYTHON_FLATMACHINE" ]]; then
+    PY_MACHINE_VERSION=$(rg 'SPEC_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"' "$PYTHON_FLATMACHINE" -o -r '$1' --no-heading | head -1)
+    if [[ -n "$PY_MACHINE_VERSION" && "$PY_MACHINE_VERSION" != "$FLATMACHINE_VERSION" ]]; then
+        PYTHON_MISMATCHES+=("$PYTHON_FLATMACHINE: $PY_MACHINE_VERSION (should be $FLATMACHINE_VERSION)")
+    fi
+fi
+
+TOTAL_MISMATCHES=$((TOTAL_MISMATCHES + ${#PYTHON_MISMATCHES[@]}))
+
 if [[ $TOTAL_MISMATCHES -gt 0 ]]; then
     echo "❌ Found $TOTAL_MISMATCHES file(s) with mismatched spec_version:"
     echo ""
@@ -94,10 +116,19 @@ if [[ $TOTAL_MISMATCHES -gt 0 ]]; then
         echo ""
     fi
     
+    if [[ ${#PYTHON_MISMATCHES[@]} -gt 0 ]]; then
+        echo "Python SDK mismatches:"
+        for mismatch in "${PYTHON_MISMATCHES[@]}"; do
+            echo "  - $mismatch"
+        done
+        echo ""
+    fi
+    
     exit 1
 else
     echo "✓ All spec_version references match:"
     echo "  - flatagent configs use v$FLATAGENT_VERSION"
     echo "  - flatmachine configs use v$FLATMACHINE_VERSION"
+    echo "  - Python SDK matches .d.ts versions"
     exit 0
 fi
