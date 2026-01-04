@@ -89,7 +89,14 @@ class FlatMachine:
 
         self.execution_id = str(uuid.uuid4())
         
+        # Extract _config_dir override (used for child machines)
+        config_dir_override = kwargs.pop('_config_dir', None)
+        
         self._load_config(config_file, config_dict)
+        
+        # Allow parent to override config_dir for child machines
+        if config_dir_override:
+            self._config_dir = config_dir_override
         
         # Merge kwargs into config data (shallow merge)
         if kwargs and 'data' in self.config:
@@ -236,6 +243,7 @@ class FlatMachine:
         self.machine_name = self.data.get('name', 'unnamed-machine')
         self.initial_context = self.data.get('context', {})
         self.agent_refs = self.data.get('agents', {})
+        self.machine_refs = self.data.get('machines', {})
         self.states = self.data.get('states', {})
         self.settings = self.data.get('settings', {})
 
@@ -401,6 +409,32 @@ class FlatMachine:
         
         raise ValueError(f"Invalid reference type: {type(ref)}")
 
+    def _resolve_machine_config(self, name: str) -> Dict[str, Any]:
+        """Resolve a machine reference to a config dict."""
+        ref = self.machine_refs.get(name)
+        if not ref:
+            raise ValueError(f"Unknown machine reference: {name}. Check 'machines:' section in config.")
+
+        if isinstance(ref, dict):
+            return ref
+
+        if isinstance(ref, str):
+            path = ref
+            if not os.path.isabs(path):
+                path = os.path.join(self._config_dir, path)
+            
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Machine config file not found: {path}")
+
+            with open(path, 'r') as f:
+                if path.endswith('.json'):
+                    return json.load(f) or {}
+                if yaml:
+                    return yaml.safe_load(f) or {}
+                raise ImportError("pyyaml required for YAML files")
+        
+        raise ValueError(f"Invalid machine reference type: {type(ref)}")
+
     async def _run_hook(self, method_name: str, *args) -> Any:
         """Run a hook method, awaiting if it's a coroutine."""
         method = getattr(self._hooks, method_name)
@@ -432,7 +466,7 @@ class FlatMachine:
         # 2. Handle 'machine' (child machine execution)
         machine_name = state.get('machine')
         if machine_name:
-            target_config = self._resolve_config(machine_name)
+            target_config = self._resolve_machine_config(machine_name)
             input_spec = state.get('input', {})
             variables = {"context": context, "input": context}
             machine_input = self._render_dict(input_spec, variables)

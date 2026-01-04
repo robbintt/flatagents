@@ -1,0 +1,80 @@
+# Multi-Chapter Story Orchestrator (Parent Machine)
+# Demonstrates HSM: outlines story, then calls chapter_writer child for each chapter
+
+spec: flatmachine
+spec_version: "0.2.0"
+
+data:
+  name: story-orchestrator
+  
+  # Enable checkpoint persistence to disk
+  persistence:
+    enabled: true
+    backend: local
+  
+  context:
+    genre: "{{ input.genre }}"
+    premise: "{{ input.premise }}"
+    num_chapters: "{{ input.num_chapters | default(2) }}"
+    title: null
+    outline: null
+    current_chapter: 0
+    chapters: []
+  
+  agents:
+    outliner: ./outliner.yml
+  
+  # Child machine for writing individual chapters
+  machines:
+    chapter_writer: ./chapter_machine.yml
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: create_outline
+
+    # Step 1: Create story outline with chapter summaries
+    create_outline:
+      agent: outliner
+      execution:
+        type: retry
+        backoffs: [2, 8, 16]
+        jitter: 0.1
+      input:
+        genre: "{{ context.genre }}"
+        premise: "{{ context.premise }}"
+        num_chapters: "{{ context.num_chapters }}"
+      output_to_context:
+        title: "{{ output.title }}"
+        outline: "{{ output.chapter_outlines }}"
+      transitions:
+        - to: write_chapter
+
+    # Step 2: Write each chapter via child machine
+    write_chapter:
+      machine: chapter_writer
+      input:
+        genre: "{{ context.genre }}"
+        title: "{{ context.title }}"
+        chapter_number: "{{ context.current_chapter + 1 }}"
+        chapter_outline: "{{ context.outline[context.current_chapter] }}"
+        previous_chapters: "{{ context.chapters }}"
+      output_to_context:
+        chapters: "{{ (context.chapters + [output.final_chapter]) | tojson }}"
+        current_chapter: "{{ context.current_chapter + 1 }}"
+      transitions:
+        - condition: "context.current_chapter >= context.num_chapters"
+          to: done
+        - to: write_chapter
+
+    done:
+      type: final
+      output:
+        title: "{{ context.title }}"
+        chapters: "{{ context.chapters | tojson }}"
+        chapters_completed: "{{ context.chapters | length }}"
+
+metadata:
+  description: "Hierarchical multi-chapter story writer with checkpoint/resume"
+  tags: ["hsm", "checkpoint", "creative"]

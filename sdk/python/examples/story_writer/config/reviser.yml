@@ -1,0 +1,34 @@
+# Chapter Reviser Agent - Improves draft based on feedback
+spec: flatagent
+spec_version: "0.6.0"
+
+data:
+  name: chapter-reviser
+  
+  model:
+    provider: cerebras
+    name: zai-glm-4.6
+    temperature: 0.6
+  
+  system: |
+    You are a skilled fiction editor. Revise drafts based on feedback while 
+    preserving the author's voice and story intent. Make targeted improvements.
+  
+  user: |
+    Revise this chapter based on the feedback:
+    
+    ORIGINAL CHAPTER:
+    {{ input.chapter_text }}
+    
+    FEEDBACK:
+    {{ input.critique }}
+    
+    Revise the chapter, incorporating the feedback. Keep approximately the same length.
+  
+  output:
+    revised_text:
+      type: str
+      description: The revised chapter text
+
+metadata:
+  description: "Revises chapters based on editorial feedback"

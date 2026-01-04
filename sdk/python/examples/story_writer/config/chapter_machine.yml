@@ -1,0 +1,71 @@
+# Chapter Writer Child Machine
+# Draft → Critique → Revise loop for a single chapter
+
+spec: flatmachine
+spec_version: "0.2.0"
+
+data:
+  name: chapter-writer
+  
+  context:
+    genre: "{{ input.genre }}"
+    title: "{{ input.title }}"
+    chapter_number: "{{ input.chapter_number }}"
+    chapter_outline: "{{ input.chapter_outline }}"
+    previous_chapters: "{{ input.previous_chapters | default([]) }}"
+    draft: null
+    critique: null
+    final_chapter: null
+  
+  agents:
+    drafter: ./drafter.yml
+    critic: ./critic.yml
+    reviser: ./reviser.yml
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: draft
+
+    draft:
+      agent: drafter
+      input:
+        genre: "{{ context.genre }}"
+        title: "{{ context.title }}"
+        chapter_number: "{{ context.chapter_number }}"
+        outline: "{{ context.chapter_outline }}"
+        previous_summary: "{{ context.previous_chapters[-1][:500] if context.previous_chapters else 'This is the first chapter.' }}"
+      output_to_context:
+        draft: "{{ output.chapter_text }}"
+      transitions:
+        - to: critique
+
+    critique:
+      agent: critic
+      input:
+        genre: "{{ context.genre }}"
+        chapter_text: "{{ context.draft }}"
+        chapter_outline: "{{ context.chapter_outline }}"
+      output_to_context:
+        critique: "{{ output.feedback }}"
+      transitions:
+        - to: revise
+
+    revise:
+      agent: reviser
+      input:
+        chapter_text: "{{ context.draft }}"
+        critique: "{{ context.critique }}"
+      output_to_context:
+        final_chapter: "{{ output.revised_text }}"
+      transitions:
+        - to: done
+
+    done:
+      type: final
+      output:
+        final_chapter: "{{ context.final_chapter }}"
+
+metadata:
+  description: "Child machine for draft-critique-revise chapter loop"

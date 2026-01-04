@@ -76,20 +76,27 @@ class InlineInvoker(MachineInvoker):
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         from .flatmachine import FlatMachine  # lazy import to avoid cycle
+        import hashlib
         
-        # Deterministic execution ID for target: {parent_id}:child:{target_machine_name}
-        # This allows resume logic to find the same child checkpoint
-        target_id = f"{caller_machine.execution_id}:child:{target_config.get('name', 'unknown')}"
+        # Get machine name from nested data.name (not top-level)
+        target_name = target_config.get('data', {}).get('name', 'unknown')
         
-        logger.info(f"Invoking child machine: {target_config.get('name')} (ID: {target_id})")
+        # Create a unique ID per invocation by hashing the context
+        # This ensures each loop iteration gets its own checkpoint
+        context_hash = hashlib.md5(str(sorted(context.items())).encode()).hexdigest()[:8]
+        target_id = f"{caller_machine.execution_id}:child:{target_name}:{context_hash}"
+        
+        logger.info(f"Invoking child machine: {target_name} (ID: {target_id})")
         
         # Determine if we should reuse parent's persistence/lock
         # (Usually yes for inline execution)
         target = FlatMachine(
-            config=target_config, # Passing dict directly means dynamic config
+            config_dict=target_config,  # Must use config_dict, not config
             # Pass down parent's backend/lock to keep everything in same storage
             persistence=caller_machine.persistence,
-            lock=caller_machine.lock
+            lock=caller_machine.lock,
+            # Inherit config_dir so relative agent paths resolve correctly
+            _config_dir=caller_machine._config_dir
         )
         
         # Execute child
