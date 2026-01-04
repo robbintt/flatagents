@@ -1,4 +1,4 @@
-export const SPEC_VERSION = "0.1.0";
+export const SPEC_VERSION = "0.2.0";
 export interface MachineWrapper {
     spec: "flatmachine";
     spec_version: string;
@@ -46,3 +46,26 @@ export interface Transition {
 import { AgentWrapper, OutputSchema, ModelConfig } from "./flatagent";
 export { AgentWrapper, OutputSchema };
 export type FlatmachineConfig = MachineWrapper;
+export interface MachineSnapshot {
+    execution_id: string;
+    machine_name: string;
+    spec_version: string;
+    current_state: string;
+    context: Record<string, any>;
+    step: number;
+    created_at: string;
+    event?: string;
+    output?: Record<string, any>;
+    total_api_calls?: number;
+    total_cost?: number;
+}
+export interface PersistenceConfig {
+    enabled: boolean;
+    backend: "local" | "redis" | "memory" | string;
+    checkpoint_on?: string[];
+    [key: string]: any;
+}
+export interface MachineReference {
+    path?: string;
+    inline?: MachineWrapper;
+}

@@ -140,3 +140,29 @@ Use hooks for: Pareto selection, population sampling, external API calls, databa
 | `output.*` | In `output_to_context` after agent call |
 | `context.last_error` | After error |
 | `context.last_error_type` | After error |
+
+## Persistence
+
+Enable checkpoint/resume:
+
+```yaml
+persistence:
+  enabled: true
+  backend: local     # local | memory
+```
+
+Resume after crash:
+```python
+machine = FlatMachine(config_file="machine.yml")
+execution_id = machine.execution_id  # Save this
+result = await machine.execute(...)
+
+# Later: Resume
+machine2 = FlatMachine(config_file="machine.yml")
+result = await machine2.execute(resume_from=execution_id)
+```
+
+| Checkpoint Event | Purpose |
+|------------------|---------|
+| `execute` | Before LLM calls (default) |
+| `machine_end` | Mark completion |

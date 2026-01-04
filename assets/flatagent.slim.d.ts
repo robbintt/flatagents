@@ -1,3 +1,4 @@
+export const SPEC_VERSION = "0.6.0";
 export interface AgentWrapper {
     spec: "flatagent";
     spec_version: string;

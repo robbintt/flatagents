@@ -5,8 +5,28 @@ cd "$(dirname "$0")"
 REPO_ROOT="$(cd ../.. && pwd)"
 ASSETS_DIR="$PWD/flatagents/assets"
 
+# Parse arguments
+DRY_RUN=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run|-n)
+            DRY_RUN=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 echo "=== Python SDK Release Validation ==="
+if [ "$DRY_RUN" = true ]; then
+    echo "(DRY RUN - will not upload to PyPI)"
+fi
 echo ""
+
+# Copy root TypeScript specs to sdk assets
+cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$ASSETS_DIR/"
 
 # Extract versions from root TypeScript specs
 echo "Extracting spec versions from TypeScript files..."
@@ -106,7 +126,12 @@ rm -rf dist/ build/ *.egg-info
 # Build
 python -m build
 
-# Upload to PyPI
-twine upload dist/*
-
-echo "Released $(ls dist/*.whl | head -1 | xargs basename)"
+# Upload to PyPI (unless dry-run)
+if [ "$DRY_RUN" = true ]; then
+    echo ""
+    echo "DRY RUN: Skipping PyPI upload."
+    echo "Built: $(ls dist/*.whl | head -1 | xargs basename)"
+else
+    twine upload dist/*
+    echo "Released $(ls dist/*.whl | head -1 | xargs basename)"
+fi

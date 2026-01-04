@@ -19,6 +19,11 @@ from .monitoring import get_logger
 
 logger = get_logger(__name__)
 
+try:
+    import httpx
+except ImportError:
+    httpx = None
+
 
 class MachineHooks(ABC):
     """
@@ -269,9 +274,107 @@ class CompositeHooks(MachineHooks):
         return context
 
 
+class WebhookHooks(MachineHooks):
+    """
+    Hooks that dispatch events to an HTTP endpoint.
+    
+    Requires 'httpx' installed.
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        timeout: float = 5.0,
+        api_key: Optional[str] = None
+    ):
+        if httpx is None:
+            raise ImportError("httpx is required for WebhookHooks")
+            
+        self.endpoint = endpoint
+        self.timeout = timeout
+        self.headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "FlatAgents/0.1.0"
+        }
+        if api_key:
+            self.headers["Authorization"] = f"Bearer {api_key}"
+
+    async def _send(self, event: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Send event to webhook."""
+        data = {"event": event, **payload}
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.endpoint,
+                    json=data,
+                    headers=self.headers,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                if response.status_code == 204:
+                    return None
+                return response.json()
+        except Exception as e:
+            logger.error(f"Webhook error ({event}): {e}")
+            return None
+
+    async def on_machine_start(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        resp = await self._send("machine_start", {"context": context})
+        if resp and "context" in resp:
+            return resp["context"]
+        return context
+
+    async def on_machine_end(self, context: Dict[str, Any], final_output: Dict[str, Any]) -> Dict[str, Any]:
+        resp = await self._send("machine_end", {"context": context, "output": final_output})
+        if resp and "output" in resp:
+            return resp["output"]
+        return final_output
+
+    async def on_state_enter(self, state_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        resp = await self._send("state_enter", {"state": state_name, "context": context})
+        if resp and "context" in resp:
+            return resp["context"]
+        return context
+
+    async def on_state_exit(
+        self,
+        state_name: str,
+        context: Dict[str, Any],
+        output: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        resp = await self._send("state_exit", {"state": state_name, "context": context, "output": output})
+        if resp and "output" in resp:
+            return resp["output"]
+        return output
+
+    async def on_transition(self, from_state: str, to_state: str, context: Dict[str, Any]) -> str:
+        resp = await self._send("transition", {"from": from_state, "to": to_state, "context": context})
+        if resp and "to_state" in resp:
+            return resp["to_state"]
+        return to_state
+
+    async def on_error(self, state_name: str, error: Exception, context: Dict[str, Any]) -> Optional[str]:
+        resp = await self._send("error", {
+            "state": state_name,
+            "error": str(error),
+            "error_type": type(error).__name__,
+            "context": context
+        })
+        if resp and "recovery_state" in resp:
+            return resp["recovery_state"]
+        return None  # Re-raise
+
+    async def on_action(self, action_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        resp = await self._send("action", {"action": action_name, "context": context})
+        if resp and "context" in resp:
+            return resp["context"]
+        return context
+
+
 __all__ = [
     "MachineHooks",
     "LoggingHooks",
     "MetricsHooks",
     "CompositeHooks",
+    "WebhookHooks",
 ]

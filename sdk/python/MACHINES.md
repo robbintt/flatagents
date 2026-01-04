@@ -143,3 +143,50 @@ Use hooks for: Pareto selection, population sampling, external API calls, databa
 | `output.*` | In `output_to_context` after agent call |
 | `context.last_error` | After error |
 | `context.last_error_type` | After error |
+
+## Persistence (Checkpoint/Resume)
+
+Enable crash recovery:
+
+```yaml
+persistence:
+  enabled: true
+  backend: local  # local | memory
+```
+
+Resume from checkpoint:
+```python
+machine = FlatMachine(config_file="workflow.yml")
+execution_id = machine.execution_id  # Save this
+
+try:
+    result = await machine.execute(input={...})
+except Exception:
+    print(f"Resume with: {execution_id}")
+
+# Later
+machine2 = FlatMachine(config_file="workflow.yml")
+result = await machine2.execute(resume_from=execution_id)
+```
+
+### Backends
+| Backend | Use Case |
+|---------|----------|
+| `local` | File-based, survives restarts |
+| `memory` | Ephemeral, tests only |
+
+### Hierarchical Machines
+
+Call child machines from states:
+```yaml
+agents:
+  child_workflow: "./child.yml"  # or inline config
+
+states:
+  call_child:
+    machine: child_workflow
+    input:
+      query: "{{ context.query }}"
+    output_to_context:
+      result: "{{ output.answer }}"
+```

@@ -111,11 +111,24 @@
  *         type: final
  *         output:
  *           tagline: "{{ context.tagline }}"
+ *
+ * PERSISTENCE (v0.2.0):
+ * --------------------
+ * MachineSnapshot    - Wire format for checkpoints (execution_id, state, context, step)
+ * PersistenceConfig  - Backend config: {enabled: true, backend: "local"|"memory"}
+ * checkpoint_on      - Events to checkpoint: ["machine_start", "execute", "machine_end"]
+ *
+ * HIERARCHICAL EXECUTION:
+ * -----------------------
+ * States can invoke child machines via `machine:` field
+ * MachineReference   - {path: "./child.yml"} or {inline: {...}}
  *           score: "{{ context.score }}"
  *
  *   metadata:
  *     description: "Iterative writer-critic loop"
  */
+
+export const SPEC_VERSION = "0.2.0";
 
 export interface MachineWrapper {
   spec: "flatmachine";
@@ -174,3 +187,29 @@ import { AgentWrapper, OutputSchema, ModelConfig } from "./flatagent";
 export { AgentWrapper, OutputSchema };
 
 export type FlatmachineConfig = MachineWrapper;
+
+export interface MachineSnapshot {
+  execution_id: string;
+  machine_name: string;
+  spec_version: string;
+  current_state: string;
+  context: Record<string, any>;
+  step: number;
+  created_at: string;
+  event?: string;
+  output?: Record<string, any>;
+  total_api_calls?: number;
+  total_cost?: number;
+}
+
+export interface PersistenceConfig {
+  enabled: boolean;
+  backend: "local" | "redis" | "memory" | string;
+  checkpoint_on?: string[];
+  [key: string]: any;
+}
+
+export interface MachineReference {
+  path?: string;
+  inline?: MachineWrapper;
+}

@@ -7,6 +7,7 @@ states, transitions, conditions, and loops.
 See local/flatmachines-plan.md for the full specification.
 """
 
+import asyncio
 import json
 import os
 from typing import Any, Dict, Optional
@@ -27,6 +28,22 @@ from .execution import get_execution_type, ExecutionType
 from .hooks import MachineHooks, LoggingHooks
 from .flatagent import FlatAgent
 
+import uuid
+from .persistence import (
+    PersistenceBackend,
+    LocalFileBackend,
+    MemoryBackend,
+    CheckpointManager,
+    MachineSnapshot
+)
+from .locking import ExecutionLock, LocalFileLock, NoOpLock
+from .actions import (
+    Action,
+    HookAction,
+    MachineInvoker,
+    InlineInvoker
+)
+
 logger = get_logger(__name__)
 
 
@@ -34,21 +51,25 @@ class FlatMachine:
     """
     State machine orchestration for FlatAgents.
     
-    Executes a sequence of states, evaluating transitions and
+    Executes a sequence of states, evaluations transitions and
     managing context flow between agents.
     
-    Example:
-        machine = FlatMachine(config_file="workflow.yml")
-        result = await machine.execute(input={"product": "AI tool"})
+    Supports:
+    - Persistence (checkpoint/resume)
+    - Concurrency control (locking)
+    - Hierarchical execution (machine calls)
     """
 
-    SPEC_VERSION = "0.1.0"
+    SPEC_VERSION = "0.2.0"
 
     def __init__(
         self,
         config_file: Optional[str] = None,
         config_dict: Optional[Dict] = None,
         hooks: Optional[MachineHooks] = None,
+        persistence: Optional[PersistenceBackend] = None,
+        lock: Optional[ExecutionLock] = None,
+        invoker: Optional[MachineInvoker] = None,
         **kwargs
     ):
         """
@@ -58,12 +79,22 @@ class FlatMachine:
             config_file: Path to YAML/JSON config file
             config_dict: Configuration dictionary
             hooks: Custom hooks for extensibility
+            persistence: Storage backend (overrides config)
+            lock: Concurrency lock (overrides config)
+            invoker: Strategy for invoking other machines
             **kwargs: Override config values
         """
         if Template is None:
             raise ImportError("jinja2 is required. Install with: pip install jinja2")
 
+        self.execution_id = str(uuid.uuid4())
+        
         self._load_config(config_file, config_dict)
+        
+        # Merge kwargs into config data (shallow merge)
+        if kwargs and 'data' in self.config:
+            self.config['data'].update(kwargs)
+            
         self._validate_spec()
         self._parse_machine_config()
 
@@ -84,8 +115,61 @@ class FlatMachine:
         # Execution tracking
         self.total_api_calls = 0
         self.total_cost = 0.0
+        
+        # Persistence & Locking
+        self._initialize_persistence(persistence, lock)
+        
+        # Invoker (for child machines)
+        self.invoker = invoker or InlineInvoker()
 
-        logger.info(f"Initialized FlatMachine: {self.machine_name}")
+        logger.info(f"Initialized FlatMachine: {self.machine_name} (ID: {self.execution_id})")
+
+    def _initialize_persistence(
+        self,
+        persistence: Optional[PersistenceBackend],
+        lock: Optional[ExecutionLock]
+    ) -> None:
+        """Initialize persistence and locking components."""
+        # Get config
+        p_config = self.data.get('persistence', {})
+        # Global features config override (simulated for now, would be in kwargs/settings)
+        # For now, rely on machine.yml or defaults
+        
+        enabled = p_config.get('enabled', True) # Default enabled? Or disable? 
+        # Plan says: "Global Defaults... backend: local".
+        # Let's default to enabled=False for backward compat if not configured? 
+        # Or follow plan default? Plan implies explicit configure.
+        # Let's default to MemoryBackend if enabled but no backend specified
+        
+        backend_type = p_config.get('backend', 'memory')
+        
+        # Persistence Backend
+        if persistence:
+            self.persistence = persistence
+        elif not enabled:
+            self.persistence = MemoryBackend() # Fallback, unsaved
+        elif backend_type == 'local':
+            self.persistence = LocalFileBackend()
+        elif backend_type == 'memory':
+            self.persistence = MemoryBackend()
+        else:
+            logger.warning(f"Unknown backend '{backend_type}', using memory")
+            self.persistence = MemoryBackend()
+            
+        # Lock
+        if lock:
+            self.lock = lock
+        elif not enabled:
+            self.lock = NoOpLock()
+        elif backend_type == 'local':
+            self.lock = LocalFileLock() 
+        else:
+            self.lock = NoOpLock()
+            
+        # Checkpoint events (default set)
+        default_events = ['machine_start', 'state_enter', 'execute', 'state_exit', 'machine_end']
+        self.checkpoint_events = set(p_config.get('checkpoint_on', default_events))
+
 
     def _load_config(
         self,
@@ -290,6 +374,41 @@ class FlatMachine:
 
         return None
 
+    def _resolve_config(self, name: str) -> Dict[str, Any]:
+        """Resolve a component reference (agent/machine) to a config dict."""
+        ref = self.agent_refs.get(name)
+        if not ref:
+            raise ValueError(f"Unknown component reference: {name}")
+
+        if isinstance(ref, dict):
+            return ref
+
+        if isinstance(ref, str):
+            path = ref
+            if not os.path.isabs(path):
+                path = os.path.join(self._config_dir, path)
+            
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Component file not found: {path}")
+
+            with open(path, 'r') as f:
+                if path.endswith('.json'):
+                    return json.load(f) or {}
+                # Assume yaml
+                if yaml:
+                    return yaml.safe_load(f) or {}
+                raise ImportError("pyyaml required for YAML files")
+        
+        raise ValueError(f"Invalid reference type: {type(ref)}")
+
+    async def _run_hook(self, method_name: str, *args) -> Any:
+        """Run a hook method, awaiting if it's a coroutine."""
+        method = getattr(self._hooks, method_name)
+        result = method(*args)
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
+
     async def _execute_state(
         self,
         state_name: str,
@@ -304,41 +423,49 @@ class FlatMachine:
         state = self.states.get(state_name, {})
         output = None
 
-        # Handle hook actions
-        action = state.get('action')
-        if action:
-            context = self._hooks.on_action(action, context)
+        # 1. Handle 'action' (hooks/custom actions)
+        action_name = state.get('action')
+        if action_name:
+            action_impl = HookAction(self._hooks)
+            context = await action_impl.execute(action_name, context, config={})
 
-        # Handle agent execution
+        # 2. Handle 'machine' (child machine execution)
+        machine_name = state.get('machine')
+        if machine_name:
+            target_config = self._resolve_config(machine_name)
+            input_spec = state.get('input', {})
+            variables = {"context": context, "input": context}
+            machine_input = self._render_dict(input_spec, variables)
+            output = await self.invoker.invoke(self, target_config, machine_input)
+            
+            output_mapping = state.get('output_to_context', {})
+            if output_mapping:
+                safe_output = output or {}
+                variables = {"context": context, "output": safe_output, "input": context}
+                for ctx_key, template in output_mapping.items():
+                    context[ctx_key] = self._render_template(template, variables)
+
+        # 3. Handle 'agent' (LLM execution)
         agent_name = state.get('agent')
         if agent_name:
             agent = self._get_agent(agent_name)
-
-            # Prepare input
             input_spec = state.get('input', {})
             variables = {"context": context, "input": context}
             agent_input = self._render_dict(input_spec, variables)
 
-            # Track pre-call stats to compute delta
             pre_calls = agent.total_api_calls
             pre_cost = agent.total_cost
 
-            # Get execution type from state config
             execution_config = state.get('execution')
             execution_type = get_execution_type(execution_config)
-
-            # Execute agent using the execution type
             output = await execution_type.execute(agent, agent_input)
 
-            # Track costs (delta, not cumulative)
             self.total_api_calls += agent.total_api_calls - pre_calls
             self.total_cost += agent.total_cost - pre_cost
 
-            # Ensure output is a dict
             if output is None:
                 output = {}
 
-            # Map output to context
             output_mapping = state.get('output_to_context', {})
             if output_mapping:
                 variables = {"context": context, "output": output, "input": context}
@@ -354,121 +481,138 @@ class FlatMachine:
 
         return context, output
 
+    async def _save_checkpoint(
+        self,
+        event: str,
+        state_name: str,
+        step: int,
+        context: Dict[str, Any],
+        output: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Save a checkpoint if configured."""
+        if event not in self.checkpoint_events:
+            return
+
+        snapshot = MachineSnapshot(
+            execution_id=self.execution_id,
+            machine_name=self.machine_name,
+            spec_version=self.SPEC_VERSION,
+            current_state=state_name,
+            context=context,
+            step=step,
+            event=event,
+            output=output
+        )
+        
+        manager = CheckpointManager(self.persistence, self.execution_id)
+        await manager.save_checkpoint(snapshot)
+
     async def execute(
         self,
         input: Optional[Dict[str, Any]] = None,
-        max_steps: int = 1000
+        max_steps: int = 1000,
+        resume_from: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Execute the machine.
-        
-        Args:
-            input: Initial input values
-            max_steps: Maximum number of states to execute (safety limit)
-            
-        Returns:
-            Final output from the machine
-        """
-        input = input or {}
+        """Execute the machine."""
+        if resume_from:
+            self.execution_id = resume_from
+            logger.info(f"Resuming execution: {self.execution_id}")
 
-        # Initialize context from template
-        variables = {"input": input}
-        context = self._render_dict(self.initial_context, variables)
+        if not await self.lock.acquire(self.execution_id):
+            raise RuntimeError(f"Could not acquire lock for execution {self.execution_id}")
 
-        # Hook: machine start
-        context = self._hooks.on_machine_start(context)
+        try:
+            context = {}
+            current_state = None
+            step = 0
+            final_output = {}
+            manager = CheckpointManager(self.persistence, self.execution_id)
 
-        current_state = self._initial_state
-        step = 0
-        final_output = {}
+            if resume_from:
+                snapshot = await manager.load_latest()
+                if snapshot:
+                    context = snapshot.context
+                    step = snapshot.step
+                    current_state = snapshot.current_state
+                    if snapshot.event == 'machine_end':
+                        logger.info("Execution already completed.")
+                        return snapshot.output or {}
+                    logger.info(f"Restored from snapshot: step={step}, state={current_state}")
+                else:
+                    logger.warning(f"No snapshot found for {resume_from}, starting fresh.")
 
-        logger.info(f"Starting machine execution at state: {current_state}")
+            if not current_state:
+                current_state = self._initial_state
+                input = input or {}
+                variables = {"input": input}
+                context = self._render_dict(self.initial_context, variables)
 
-        while current_state and step < max_steps:
-            step += 1
+                await self._save_checkpoint('machine_start', 'start', step, context)
+                context = await self._run_hook('on_machine_start', context)
 
-            # Check if we're at a final state
-            if current_state in self._final_states:
-                # Hook: state enter
-                context = self._hooks.on_state_enter(current_state, context)
+            logger.info(f"Starting execution loop at: {current_state}")
 
-                # Execute final state
+            while current_state and step < max_steps:
+                step += 1
+                is_final = current_state in self._final_states
+
+                await self._save_checkpoint('state_enter', current_state, step, context)
+                context = await self._run_hook('on_state_enter', current_state, context)
+
+                await self._save_checkpoint('execute', current_state, step, context)
+
                 try:
                     context, output = await self._execute_state(current_state, context)
-                    if output:
+                    if output and is_final:
                         final_output = output
                 except Exception as e:
-                    # Store error info in context for templates
                     context['last_error'] = str(e)
                     context['last_error_type'] = type(e).__name__
                     
-                    # Check declarative on_error first
-                    state = self.states.get(current_state, {})
-                    recovery_state = self._get_error_recovery_state(state, e)
+                    state_config = self.states.get(current_state, {})
+                    recovery_state = self._get_error_recovery_state(state_config, e)
+                    
+                    if not recovery_state:
+                         recovery_state = await self._run_hook('on_error', current_state, e, context)
+                    
                     if recovery_state:
                         logger.warning(f"Error in {current_state}, transitioning to {recovery_state}: {e}")
                         current_state = recovery_state
                         continue
-                    
-                    # Fall back to hook
-                    recovery_state = self._hooks.on_error(current_state, e, context)
-                    if recovery_state:
-                        current_state = recovery_state
-                        continue
                     raise
 
-                # Hook: state exit
-                self._hooks.on_state_exit(current_state, context, output)
+                await self._save_checkpoint(
+                    'state_exit', 
+                    current_state, 
+                    step, 
+                    context, 
+                    output=output if is_final else None
+                )
 
-                logger.info(f"Reached final state: {current_state}")
-                break
+                output = await self._run_hook('on_state_exit', current_state, context, output)
 
-            # Hook: state enter
-            context = self._hooks.on_state_enter(current_state, context)
+                if is_final:
+                    logger.info(f"Reached final state: {current_state}")
+                    break
 
-            # Execute current state
-            try:
-                context, output = await self._execute_state(current_state, context)
-            except Exception as e:
-                # Store error info in context for templates
-                context['last_error'] = str(e)
-                context['last_error_type'] = type(e).__name__
+                next_state = self._find_next_state(current_state, context)
                 
-                # Check declarative on_error first
-                state = self.states.get(current_state, {})
-                recovery_state = self._get_error_recovery_state(state, e)
-                if recovery_state:
-                    logger.warning(f"Error in {current_state}, transitioning to {recovery_state}: {e}")
-                    current_state = recovery_state
-                    continue
-                
-                # Fall back to hook
-                recovery_state = self._hooks.on_error(current_state, e, context)
-                if recovery_state:
-                    current_state = recovery_state
-                    continue
-                raise
+                if next_state:
+                    next_state = await self._run_hook('on_transition', current_state, next_state, context)
 
-            # Hook: state exit
-            output = self._hooks.on_state_exit(current_state, context, output)
+                logger.debug(f"Transition: {current_state} -> {next_state}")
+                current_state = next_state
 
-            # Find next state
-            next_state = self._find_next_state(current_state, context)
+            if step >= max_steps:
+                logger.warning(f"Machine hit max_steps limit ({max_steps})")
 
-            if next_state:
-                # Hook: transition
-                next_state = self._hooks.on_transition(current_state, next_state, context)
+            await self._save_checkpoint('machine_end', 'end', step, context, output=final_output)
+            final_output = await self._run_hook('on_machine_end', context, final_output)
 
-            logger.debug(f"Transition: {current_state} -> {next_state}")
-            current_state = next_state
+            return final_output
 
-        if step >= max_steps:
-            logger.warning(f"Machine hit max_steps limit ({max_steps})")
-
-        # Hook: machine end
-        final_output = self._hooks.on_machine_end(context, final_output)
-
-        return final_output
+        finally:
+            await self.lock.release(self.execution_id)
 
     def execute_sync(
         self,
