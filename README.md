@@ -1,5 +1,9 @@
 # FlatAgents
 
+**Spec Status:** Stable. Extension planned.
+
+**Python SDK Status:** Functioning Prototype.
+
 LLM/machine readers: use MACHINES.md as a primary reference, it is more comprehensive and token efficient.
 
 A specification for LLM-powered agents. Define agents in YAML/JSON, run them anywhere.
