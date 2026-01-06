@@ -1,6 +1,6 @@
 /**
- * FlatMachine Configuration Schema v0.1.0
- * =============================================
+ * FlatMachine Configuration Schema
+ * ================================
  *
  * A machine defines how agents are connected and executed:
  * states, transitions, conditions, and loops.
@@ -11,7 +11,7 @@
  * STRUCTURE:
  * ----------
  * spec           - Fixed string "flatmachine"
- * spec_version   - Semver string (e.g., "0.1.0")
+ * spec_version   - Semver string
  * data           - The machine configuration
  * metadata       - Extensibility layer
  *
@@ -67,7 +67,7 @@
  * ----------------------
  *
  *   spec: flatmachine
- *   spec_version: "0.1.0"
+ *   spec_version: "0.0.0"
  *
  *   data:
  *     name: writer-critic-loop

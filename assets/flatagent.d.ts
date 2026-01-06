@@ -1,6 +1,6 @@
 /**
- * FlatAgents Configuration Schema v0.6.0
- * =============================================
+ * FlatAgents Configuration Schema
+ * ===============================
  *
  * An agent is a single LLM call: model + prompts + output schema.
  * Workflows handle composition, branching, and loops.
@@ -8,7 +8,7 @@
  * STRUCTURE:
  * ----------
  * spec           - Fixed string "flatagents"
- * spec_version   - Semver string (e.g., "0.1.0")
+ * spec_version   - Semver string
  * data           - The agent configuration
  * metadata       - Extensibility layer (runners ignore unrecognized keys)
  *
@@ -64,7 +64,7 @@
  * ----------------------
  *
  *   spec: flatagents 
- *   spec_version: "0.6.0"
+ *   spec_version: "0.0.0"
  *
  *   data:
  *     name: critic

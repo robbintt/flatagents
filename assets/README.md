@@ -1,5 +1,11 @@
-# Static Spec Assets
+# Specification Static Assets
 
-These assets are bundled with SDKs or may be manually supplied to LLMs.
+**IMPORTANT: The canonical specs are in the repo root.**
 
-To regenerate these use `/scripts/generate-spec-assets.sh`
+* `*.d.ts` - copied from canonical spec at repo.
+* `*.slim.d.ts` - No comments, less context.
+* `*.schema.json` - Automated json conversion.
+
+These assets are included here for easy availability for machines or to copy to SDKs.
+
+It is recommended to directly regenerate these assets in your sdk release with `/scripts/generate-spec-assets.sh`
