@@ -148,15 +148,28 @@ class FlatAgent:
         logger.info(f"Initialized FlatAgent: {self.agent_name} (backend: {self._backend})")
 
     def _auto_detect_backend(self) -> str:
-        """Auto-detect available backend, preferring aisuite."""
-        if aisuite is not None:
-            return "aisuite"
+        """
+        Auto-detect available LLM backend.
+        
+        Priority:
+        1. FLATAGENTS_BACKEND env var (e.g., "litellm" or "aisuite")
+        2. litellm if installed (preferred for stability)
+        3. aisuite if installed
+        """
+        # Check env var first (SDK-specific override, not in config)
+        env_backend = os.environ.get("FLATAGENTS_BACKEND", "").lower()
+        if env_backend in ("litellm", "aisuite"):
+            return env_backend
+        
+        # Prefer litellm for stability
         if litellm is not None:
             return "litellm"
+        if aisuite is not None:
+            return "aisuite"
         raise ImportError(
             "No LLM backend available. Install one of:\n"
-            "  pip install aisuite    (recommended)\n"
-            "  pip install litellm"
+            "  pip install litellm    (recommended)\n"
+            "  pip install aisuite"
         )
 
     def _init_backend(self) -> None:
