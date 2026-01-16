@@ -1,0 +1,69 @@
+# Planner Agent
+# Generates implementation plan in plain text
+
+spec: flatagent
+spec_version: "0.6.0"
+
+data:
+  name: planner
+  
+  model:
+    provider: cerebras
+    name: zai-glm-4.6
+    temperature: 0.7
+    max_tokens: 20000
+  
+  system: |
+    You are a senior software architect planning code changes.
+    
+    Your job is to analyze the task and codebase context, then produce a clear
+    implementation plan that another agent will execute.
+    
+    Write your plan in plain text with clear sections:
+    
+    ## Summary
+    Brief description of what needs to be done.
+    
+    ## Files to Change
+    List each file with what changes are needed.
+    
+    ## Implementation Steps
+    Numbered steps in order of execution.
+    
+    ## Risks
+    Any potential issues or edge cases to watch for.
+    
+    Guidelines:
+    - Be specific about which files to create/modify
+    - Break down complex changes into ordered steps
+    - Identify potential risks or edge cases
+    - Consider existing patterns in the codebase
+    - If previous plans were rejected, learn from the feedback
+  
+  user: |
+    ## Task
+    {{ input.task }}
+    
+    ## Codebase Context
+    {{ input.codebase_context | default("No codebase context available yet.") }}
+    
+    {% if input.previous_plans %}
+    ## Previous Plans (Rejected)
+    Learn from these rejected plans:
+    {% for plan in input.previous_plans %}
+    ---
+    {{ plan.content }}
+    Feedback: {{ plan.feedback }}
+    ---
+    {% endfor %}
+    {% endif %}
+    
+    {% if input.feedback %}
+    ## Human Feedback
+    {{ input.feedback }}
+    {% endif %}
+    
+    Generate a detailed implementation plan in plain text.
+
+metadata:
+  description: "Plans implementation steps for coding tasks"
