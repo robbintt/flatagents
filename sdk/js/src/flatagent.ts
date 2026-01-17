@@ -1,9 +1,11 @@
 import * as nunjucks from "nunjucks";
 import * as yaml from "yaml";
 import { readFileSync } from 'fs';
-import { AgentConfig } from './types';
+import { dirname } from 'path';
+import { AgentConfig, ModelConfig } from './types';
 import { MCPToolProvider } from './mcp';
 import { LLMBackend, Message, VercelAIBackend } from './llm';
+import { resolveModelConfig } from './profiles';
 
 /**
  * Options for constructing a FlatAgent with custom backends.
@@ -17,12 +19,18 @@ export interface AgentOptions {
 
   /** Base directory for resolving relative paths */
   configDir?: string;
+
+  /** Path to profiles.yml for model profile resolution */
+  profilesFile?: string;
 }
 
 export class FlatAgent {
   public config: AgentConfig;
   private mcpProvider?: MCPToolProvider;
   private llmBackend?: LLMBackend;
+  private configDir: string;
+  private profilesFile?: string;
+  private resolvedModelConfig: ModelConfig;
 
   /**
    * Create a FlatAgent.
@@ -30,19 +38,29 @@ export class FlatAgent {
    * @param configOrOptions - Config path, config object, or AgentOptions
    */
   constructor(configOrOptions: AgentConfig | string | AgentOptions) {
+    let configPath: string | undefined;
+
     if (configOrOptions && typeof configOrOptions === 'object' && 'config' in configOrOptions && !('spec' in configOrOptions)) {
       // AgentOptions provided
       const options = configOrOptions as AgentOptions;
-      this.config = typeof options.config === 'string'
-        ? yaml.parse(readFileSync(options.config, 'utf-8')) as AgentConfig
-        : options.config;
+      if (typeof options.config === 'string') {
+        configPath = options.config;
+        this.config = yaml.parse(readFileSync(options.config, 'utf-8')) as AgentConfig;
+      } else {
+        this.config = options.config;
+      }
       this.llmBackend = options.llmBackend;
+      this.configDir = options.configDir ?? (configPath ? dirname(configPath) : process.cwd());
+      this.profilesFile = options.profilesFile;
     } else if (typeof configOrOptions === 'string') {
       // Path provided
+      configPath = configOrOptions;
       this.config = yaml.parse(readFileSync(configOrOptions, 'utf-8')) as AgentConfig;
+      this.configDir = dirname(configOrOptions);
     } else {
       // AgentConfig provided directly
       this.config = configOrOptions as AgentConfig;
+      this.configDir = process.cwd();
     }
 
     const configData = this.config && typeof this.config === "object"
@@ -50,6 +68,18 @@ export class FlatAgent {
       : undefined;
     if (configData?.expression_engine === "cel") {
       throw new Error("expression_engine 'cel' is not supported in the JS SDK yet");
+    }
+
+    // Resolve model config through profiles (only if we have valid config data)
+    if (configData?.model) {
+      this.resolvedModelConfig = resolveModelConfig(
+        configData.model,
+        this.configDir,
+        this.profilesFile
+      );
+    } else {
+      // Fallback for malformed/incomplete configs
+      this.resolvedModelConfig = { name: '' };
     }
   }
 
@@ -59,8 +89,9 @@ export class FlatAgent {
   private getBackend(): LLMBackend {
     if (!this.llmBackend) {
       this.llmBackend = new VercelAIBackend({
-        provider: this.config.data.model.provider ?? 'openai',
-        name: this.config.data.model.name,
+        provider: this.resolvedModelConfig.provider ?? 'openai',
+        name: this.resolvedModelConfig.name,
+        baseURL: this.resolvedModelConfig.base_url,
       });
     }
     return this.llmBackend;
@@ -78,7 +109,7 @@ export class FlatAgent {
     const toolsPrompt = this.config.data.mcp?.tool_prompt
       ? nunjucks.renderString(this.config.data.mcp.tool_prompt, { tools })
       : "";
-    const templateVars = { input, tools, tools_prompt: toolsPrompt, model: this.config.data.model };
+    const templateVars = { input, tools, tools_prompt: toolsPrompt, model: this.resolvedModelConfig };
     const system = nunjucks.renderString(this.config.data.system, templateVars);
     let user = nunjucks.renderString(this.config.data.user, templateVars);
     if (this.config.data.instruction_suffix) {
@@ -91,17 +122,16 @@ export class FlatAgent {
       { role: 'user', content: user },
     ];
 
-    // Get model config options
-    const modelConfig = this.config.data.model;
-
-    // Call LLM via backend
+    // Call LLM via backend with resolved model config
     const backend = this.getBackend();
     const text = await backend.call(messages, {
-      temperature: modelConfig.temperature,
-      max_tokens: modelConfig.max_tokens,
-      top_p: modelConfig.top_p,
-      frequency_penalty: modelConfig.frequency_penalty,
-      presence_penalty: modelConfig.presence_penalty,
+      temperature: this.resolvedModelConfig.temperature,
+      max_tokens: this.resolvedModelConfig.max_tokens,
+      top_p: this.resolvedModelConfig.top_p,
+      top_k: this.resolvedModelConfig.top_k,
+      frequency_penalty: this.resolvedModelConfig.frequency_penalty,
+      presence_penalty: this.resolvedModelConfig.presence_penalty,
+      seed: this.resolvedModelConfig.seed,
     });
 
     // Extract structured output

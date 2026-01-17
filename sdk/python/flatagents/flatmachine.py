@@ -81,6 +81,7 @@ class FlatMachine:
         lock: Optional[ExecutionLock] = None,
         invoker: Optional[MachineInvoker] = None,
         result_backend: Optional[ResultBackend] = None,
+        profiles_file: Optional[str] = None,
         **kwargs
     ):
         """
@@ -94,6 +95,7 @@ class FlatMachine:
             lock: Concurrency lock (overrides config)
             invoker: Strategy for invoking other machines
             result_backend: Backend for inter-machine result storage
+            profiles_file: Path to profiles.yml for model profile resolution
             **kwargs: Override config values
         """
         if Template is None:
@@ -102,10 +104,13 @@ class FlatMachine:
         # Extract execution_id if passed (for launched machines)
         self.execution_id = kwargs.pop('_execution_id', None) or str(uuid.uuid4())
         self.parent_execution_id = kwargs.pop('_parent_execution_id', None)
-        
+
         # Extract _config_dir override (used for launched machines)
         config_dir_override = kwargs.pop('_config_dir', None)
-        
+
+        # Store profiles file for agent instantiation
+        self._profiles_file = profiles_file or kwargs.pop('_profiles_file', None)
+
         self._load_config(config_file, config_dict)
         
         # Allow launcher to override config_dir for launched machines
@@ -404,10 +409,10 @@ class FlatMachine:
         if isinstance(agent_ref, str):
             if not os.path.isabs(agent_ref):
                 agent_ref = os.path.join(self._config_dir, agent_ref)
-            agent = FlatAgent(config_file=agent_ref)
+            agent = FlatAgent(config_file=agent_ref, profiles_file=self._profiles_file)
         # Handle inline config (dict)
         elif isinstance(agent_ref, dict):
-            agent = FlatAgent(config_dict=agent_ref)
+            agent = FlatAgent(config_dict=agent_ref, profiles_file=self._profiles_file)
         else:
             raise ValueError(f"Invalid agent reference: {agent_ref}")
 
@@ -665,6 +670,7 @@ class FlatMachine:
             _config_dir=peer_config_dir,
             _execution_id=child_id,
             _parent_execution_id=self.execution_id,
+            _profiles_file=self._profiles_file,
         )
 
         try:

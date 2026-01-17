@@ -1,5 +1,6 @@
 export { FlatAgent, AgentOptions } from './flatagent';
 export { FlatMachine } from './flatmachine';
+export { ProfileManager, resolveModelConfig } from './profiles';
 export {
   DefaultExecution,
   RetryExecution,
@@ -54,5 +55,9 @@ export type {
   PersistenceBackend,
   ResultBackend,
   MachineOptions,
-  BackendConfig
+  BackendConfig,
+  ModelConfig,
+  ModelProfileConfig,
+  ProfiledModelConfig,
+  ProfilesConfig
 } from './types';

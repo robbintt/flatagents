@@ -32,6 +32,7 @@ export class FlatMachine {
   private resultBackend?: ResultBackend;
   private executionLock: ExecutionLock;
   private configDir: string;
+  private profilesFile?: string;
   private checkpointEvents = new Set<string>();
   private parentExecutionId?: string;
   private pendingLaunches: LaunchIntent[] = [];
@@ -44,6 +45,7 @@ export class FlatMachine {
       : options.config;
     this.hooks = options.hooks;
     this.configDir = options.configDir ?? process.cwd();
+    this.profilesFile = options.profilesFile;
     this.executionId = options.executionId ?? this.executionId;
     this.parentExecutionId = options.parentExecutionId;
 
@@ -372,13 +374,19 @@ export class FlatMachine {
   private createAgent(agentRef: any): FlatAgent {
     if (agentRef && typeof agentRef === "object") {
       if (agentRef.spec === "flatagent" && agentRef.data) {
-        return new FlatAgent(agentRef);
+        return new FlatAgent({ config: agentRef, profilesFile: this.profilesFile });
       }
       if (agentRef.path) {
-        return new FlatAgent(`${this.configDir}/${agentRef.path}`);
+        return new FlatAgent({
+          config: `${this.configDir}/${agentRef.path}`,
+          profilesFile: this.profilesFile,
+        });
       }
     }
-    return new FlatAgent(`${this.configDir}/${agentRef}`);
+    return new FlatAgent({
+      config: `${this.configDir}/${agentRef}`,
+      profilesFile: this.profilesFile,
+    });
   }
 
   private createMachine(
@@ -393,6 +401,7 @@ export class FlatMachine {
       hooks: this.hooks,
       executionId: overrides?.executionId,
       parentExecutionId: overrides?.parentExecutionId,
+      profilesFile: this.profilesFile,
     });
   }
 

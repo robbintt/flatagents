@@ -25,8 +25,10 @@ export interface LLMOptions {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  top_k?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+  seed?: number;
   tools?: ToolDefinition[];
   response_format?: { type: 'json_object' } | { type: 'text' };
 }

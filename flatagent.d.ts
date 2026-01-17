@@ -41,8 +41,18 @@
  * temperature       - Sampling temperature (0.0 to 2.0)
  * max_tokens        - Maximum tokens to generate
  * top_p             - Nucleus sampling parameter
+ * top_k             - Top-k sampling parameter
  * frequency_penalty - Frequency penalty (-2.0 to 2.0)
  * presence_penalty  - Presence penalty (-2.0 to 2.0)
+ * seed              - Random seed for reproducibility
+ * base_url          - Custom API base URL (for local models/proxies)
+ *
+ * MODEL PROFILES:
+ * ---------------
+ * Agents can reference model profiles from profiles.yml:
+ *   model: "fast-cheap"                    # String = profile lookup
+ *   model: { profile: "fast-cheap" }       # Profile with optional overrides
+ *   model: { provider: x, name: y, ... }   # Inline config (no profile)
  *
  * OUTPUT FIELD DEFINITION:
  * ------------------------
@@ -126,7 +136,7 @@
  *   deny  - Tools to deny (takes precedence over allow)
  */
 
-export const SPEC_VERSION = "0.6.0";
+export const SPEC_VERSION = "0.7.0";
 
 export interface AgentWrapper {
   spec: "flatagent";
@@ -137,7 +147,13 @@ export interface AgentWrapper {
 
 export interface AgentData {
   name?: string;
-  model: ModelConfig;
+  /**
+   * Model configuration.
+   * - String: Profile name lookup (e.g., "fast-cheap")
+   * - ModelConfig: Inline config with name, provider, etc.
+   * - ProfiledModelConfig: Profile reference with optional overrides
+   */
+  model: string | ModelConfig | ProfiledModelConfig;
   system: string;
   user: string;
   instruction_suffix?: string;
@@ -171,8 +187,20 @@ export interface ModelConfig {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  top_k?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+  seed?: number;
+  base_url?: string;
+}
+
+/**
+ * Model config that references a profile with optional overrides.
+ * Example: { profile: "fast-cheap", temperature: 0.8 }
+ */
+export interface ProfiledModelConfig extends Partial<ModelConfig> {
+  /** Profile name to use as base */
+  profile: string;
 }
 
 export type OutputSchema = Record<string, OutputFieldDef>;

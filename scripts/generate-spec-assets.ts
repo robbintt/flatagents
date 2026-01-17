@@ -31,6 +31,7 @@ interface SpecConfig {
 const SPECS: SpecConfig[] = [
   { filename: "flatagent.d.ts", rootType: "AgentWrapper" },
   { filename: "flatmachine.d.ts", rootType: "MachineWrapper" },
+  { filename: "profiles.d.ts", rootType: "ProfilesWrapper" },
 ];
 
 /**

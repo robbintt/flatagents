@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ProfilesWrapper",
+  "definitions": {
+    "ProfilesWrapper": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "string",
+          "const": "flatprofiles"
+        },
+        "spec_version": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/ProfilesData"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "spec",
+        "spec_version",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "ProfilesData": {
+      "type": "object",
+      "properties": {
+        "model_profiles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ModelProfileConfig"
+          },
+          "description": "Named model profiles, keyed by profile name"
+        },
+        "default": {
+          "type": "string",
+          "description": "Default profile name - used when agent has no model config"
+        },
+        "override": {
+          "type": "string",
+          "description": "Override profile name - trumps all agent model configs"
+        }
+      },
+      "required": [
+        "model_profiles"
+      ],
+      "additionalProperties": false
+    },
+    "ModelProfileConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Model name (e.g., \"gpt-4\", \"zai-glm-4.6\", \"claude-3-opus-20240229\")"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider name (e.g., \"openai\", \"anthropic\", \"cerebras\", \"ollama\")"
+        },
+        "temperature": {
+          "type": "number",
+          "description": "Sampling temperature (0.0 to 2.0)"
+        },
+        "max_tokens": {
+          "type": "number",
+          "description": "Maximum tokens to generate"
+        },
+        "top_p": {
+          "type": "number",
+          "description": "Nucleus sampling parameter (0.0 to 1.0)"
+        },
+        "top_k": {
+          "type": "number",
+          "description": "Top-k sampling parameter"
+        },
+        "frequency_penalty": {
+          "type": "number",
+          "description": "Frequency penalty (-2.0 to 2.0)"
+        },
+        "presence_penalty": {
+          "type": "number",
+          "description": "Presence penalty (-2.0 to 2.0)"
+        },
+        "seed": {
+          "type": "number",
+          "description": "Random seed for reproducibility"
+        },
+        "base_url": {
+          "type": "string",
+          "description": "Custom base URL for the API (e.g., for local models or proxies)"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "Model profile configuration. Defines all parameters for an LLM model."
+    }
+  }
+}

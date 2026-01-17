@@ -1,4 +1,4 @@
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 from .baseagent import (
     # Base agent (abstract, for multi-step agents)
@@ -67,6 +67,10 @@ from .persistence import (
     CheckpointManager,
     MachineSnapshot,
 )
+from .profiles import (
+    ProfileManager,
+    resolve_model_config,
+)
 
 __all__ = [
     "__version__",
@@ -133,4 +137,7 @@ __all__ = [
     "MemoryBackend",
     "CheckpointManager",
     "MachineSnapshot",
+    # Model Profiles
+    "ProfileManager",
+    "resolve_model_config",
 ]

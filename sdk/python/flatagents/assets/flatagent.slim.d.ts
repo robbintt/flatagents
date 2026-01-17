@@ -1,4 +1,4 @@
-export const SPEC_VERSION = "0.6.0";
+export const SPEC_VERSION = "0.7.0";
 export interface AgentWrapper {
     spec: "flatagent";
     spec_version: string;
@@ -7,7 +7,7 @@ export interface AgentWrapper {
 }
 export interface AgentData {
     name?: string;
-    model: ModelConfig;
+    model: string | ModelConfig | ProfiledModelConfig;
     system: string;
     user: string;
     instruction_suffix?: string;
@@ -37,8 +37,14 @@ export interface ModelConfig {
     temperature?: number;
     max_tokens?: number;
     top_p?: number;
+    top_k?: number;
     frequency_penalty?: number;
     presence_penalty?: number;
+    seed?: number;
+    base_url?: string;
+}
+export interface ProfiledModelConfig extends Partial<ModelConfig> {
+    profile: string;
 }
 export type OutputSchema = Record<string, OutputFieldDef>;
 export interface OutputFieldDef {

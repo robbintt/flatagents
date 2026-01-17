@@ -1,0 +1,46 @@
+# Model Profiles Configuration
+# Centralized model configurations that agents can reference by name
+
+spec: flatprofiles
+spec_version: "0.1.0"
+
+data:
+  model_profiles:
+    # Fast and cheap - good for development/iteration
+    fast-cheap:
+      provider: cerebras
+      name: zai-glm-4.6
+      temperature: 0.6
+      max_tokens: 2048
+
+    # Smart and expensive - good for production/complex tasks
+    smart-expensive:
+      provider: anthropic
+      name: claude-3-opus-20240229
+      temperature: 0.3
+      max_tokens: 4096
+
+    # Local development with Ollama
+    local-dev:
+      provider: ollama
+      name: llama3
+      base_url: http://localhost:11434
+      temperature: 0.7
+      max_tokens: 4096
+
+    # Deterministic output for testing
+    deterministic:
+      provider: openai
+      name: gpt-4-turbo
+      temperature: 0
+      seed: 42
+      max_tokens: 2048
+
+  # Default profile used when agent has no model config
+  default: fast-cheap
+
+  # Override profile - uncomment to force all agents to use this
+  # override: smart-expensive
+
+metadata:
+  description: "Model profiles for the helloworld example"

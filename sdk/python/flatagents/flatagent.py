@@ -114,7 +114,7 @@ class FlatAgent:
                 # Handle tool result...
     """
 
-    SPEC_VERSION = "0.6.0"
+    SPEC_VERSION = "0.7.0"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
     def __init__(
@@ -123,11 +123,13 @@ class FlatAgent:
         config_dict: Optional[Dict] = None,
         tool_provider: Optional["MCPToolProvider"] = None,
         backend: Optional[str] = None,
+        profiles_file: Optional[str] = None,
         **kwargs
     ):
         if jinja2 is None:
             raise ImportError("jinja2 is required for FlatAgent. Install with: pip install jinja2")
 
+        self._profiles_file = profiles_file
         self._load_config(config_file, config_dict, **kwargs)
         self._validate_spec()
         self._parse_agent_config()
@@ -254,7 +256,7 @@ class FlatAgent:
         config_dict: Optional[Dict],
         **kwargs
     ):
-        """Load v0.6.0 container config."""
+        """Load v0.6.0 container config with profile resolution."""
         import os
         try:
             import yaml
@@ -262,6 +264,8 @@ class FlatAgent:
             yaml = None
 
         config = {}
+        config_dir = os.getcwd()
+
         if config_file is not None:
             if not os.path.exists(config_file):
                 raise FileNotFoundError(f"Configuration file not found: {config_file}")
@@ -272,14 +276,24 @@ class FlatAgent:
                     if yaml is None:
                         raise ImportError("pyyaml is required for YAML config files.")
                     config = yaml.safe_load(f) or {}
+            config_dir = os.path.dirname(os.path.abspath(config_file))
         elif config_dict is not None:
             config = config_dict
 
         self.config = config
+        self._config_dir = config_dir
 
         # Extract model config from data section
         data = config.get('data', {})
-        model_config = data.get('model', {})
+        raw_model_config = data.get('model', {})
+
+        # Resolve model config through profiles
+        from .profiles import resolve_model_config
+        model_config = resolve_model_config(
+            raw_model_config,
+            config_dir,
+            profiles_file=self._profiles_file
+        )
 
         # Build model name from provider/name
         provider = model_config.get('provider')
@@ -293,6 +307,14 @@ class FlatAgent:
         self.model = kwargs.get('model', full_model_name)
         self.temperature = kwargs.get('temperature', model_config.get('temperature', 0.7))
         self.max_tokens = kwargs.get('max_tokens', model_config.get('max_tokens', 2048))
+
+        # Extended model config fields
+        self.top_p = kwargs.get('top_p', model_config.get('top_p'))
+        self.top_k = kwargs.get('top_k', model_config.get('top_k'))
+        self.frequency_penalty = kwargs.get('frequency_penalty', model_config.get('frequency_penalty'))
+        self.presence_penalty = kwargs.get('presence_penalty', model_config.get('presence_penalty'))
+        self.seed = kwargs.get('seed', model_config.get('seed'))
+        self.base_url = kwargs.get('base_url', model_config.get('base_url'))
 
         # Store full model config for template access (includes custom fields)
         self._model_config_raw = model_config
@@ -311,12 +333,12 @@ class FlatAgent:
             raise ValueError("Config missing 'data' section")
 
         # Version check with warning
-        self.spec_version = config.get('spec_version', '0.6.0')
+        self.spec_version = config.get('spec_version', '0.7.0')
         major_minor = '.'.join(self.spec_version.split('.')[:2])
-        if major_minor not in ['0.5', '0.6']:
+        if major_minor not in ['0.5', '0.6', '0.7']:
             logger.warning(
                 f"Config version {self.spec_version} may not be fully supported. "
-                f"Current SDK supports 0.5.x - 0.6.x."
+                f"Current SDK supports 0.5.x - 0.7.x."
             )
 
         # Schema validation (warnings only, non-blocking)
@@ -538,6 +560,12 @@ class FlatAgent:
             "name": self.model,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty,
+            "seed": self.seed,
+            "base_url": self.base_url,
         }
         return self._compiled_system.render(
             input=input_data,
@@ -569,6 +597,12 @@ class FlatAgent:
             "name": self.model,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty,
+            "seed": self.seed,
+            "base_url": self.base_url,
         }
         prompt = self._compiled_user.render(
             input=input_data,
@@ -664,6 +698,20 @@ class FlatAgent:
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }
+
+        # Add extended model parameters if set
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
+        if self.top_k is not None:
+            params["top_k"] = self.top_k
+        if self.frequency_penalty is not None:
+            params["frequency_penalty"] = self.frequency_penalty
+        if self.presence_penalty is not None:
+            params["presence_penalty"] = self.presence_penalty
+        if self.seed is not None:
+            params["seed"] = self.seed
+        if self.base_url is not None:
+            params["api_base"] = self.base_url  # litellm uses api_base
 
         # Add tools if available
         if tools:

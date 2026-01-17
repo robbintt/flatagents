@@ -64,18 +64,15 @@ print(result.output)
 **reviewer.yml**
 ```yaml
 spec: flatagent
-spec_version: "0.0.0"
+spec_version: "0.7.0"
 
 data:
   name: code-reviewer
 
-  model:
-    provider: openai
-    name: gpt-4
-    temperature: 0.3
+  model: "smart-expensive"  # Reference profile from profiles.yml
 
   system: |
-    You are a senior code reviewer. Analyze code for bugs, 
+    You are a senior code reviewer. Analyze code for bugs,
     style issues, and potential improvements.
 
   user: |
@@ -98,10 +95,56 @@ data:
 
 - **spec/spec_version** — Format identifier and version
 - **data.name** — Agent identifier
-- **data.model** — LLM provider, model name, and parameters
+- **data.model** — Profile name, inline config, or profile with overrides
 - **data.system** — System prompt (sets behavior)
 - **data.user** — User prompt template (uses Jinja2, `{{ input.* }}` for runtime values)
 - **data.output** — Structured output schema (the runtime extracts these fields)
+
+## Model Profiles
+
+Centralize model configurations in `profiles.yml` and reference them by name:
+
+**profiles.yml**
+```yaml
+spec: flatprofiles
+spec_version: "0.1.0"
+
+data:
+  model_profiles:
+    fast-cheap:
+      provider: cerebras
+      name: zai-glm-4.6
+      temperature: 0.6
+      max_tokens: 2048
+
+    smart-expensive:
+      provider: anthropic
+      name: claude-3-opus-20240229
+      temperature: 0.3
+      max_tokens: 4096
+
+  default: fast-cheap      # Fallback when agent has no model
+  # override: smart-expensive  # Uncomment to force all agents
+```
+
+**Agent usage:**
+```yaml
+# String shorthand — profile lookup
+model: "fast-cheap"
+
+# Profile with overrides
+model:
+  profile: "fast-cheap"
+  temperature: 0.9
+
+# Inline config (no profile)
+model:
+  provider: openai
+  name: gpt-4
+  temperature: 0.3
+```
+
+Resolution order (low → high): default profile → named profile → inline overrides → override profile
 
 ## Output Types
 
@@ -161,6 +204,7 @@ FlatMachine provides: state transitions, conditional branching, loops, retry wit
 TypeScript definitions are the source of truth:
 - [`flatagent.d.ts`](./flatagent.d.ts)
 - [`flatmachine.d.ts`](./flatmachine.d.ts)
+- [`profiles.d.ts`](./profiles.d.ts)
 
 ## Python SDK
 

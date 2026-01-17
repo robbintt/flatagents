@@ -118,7 +118,18 @@
           "type": "string"
         },
         "model": {
-          "$ref": "#/definitions/ModelConfig"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelConfig"
+            },
+            {
+              "$ref": "#/definitions/ProfiledModelConfig"
+            }
+          ],
+          "description": "Model configuration.\n- String: Profile name lookup (e.g., \"fast-cheap\")\n- ModelConfig: Inline config with name, provider, etc.\n- ProfiledModelConfig: Profile reference with optional overrides"
         },
         "system": {
           "type": "string"
@@ -161,17 +172,70 @@
         "top_p": {
           "type": "number"
         },
+        "top_k": {
+          "type": "number"
+        },
         "frequency_penalty": {
           "type": "number"
         },
         "presence_penalty": {
           "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
         }
       },
       "required": [
         "name"
       ],
       "additionalProperties": false
+    },
+    "ProfiledModelConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "type": "number"
+        },
+        "presence_penalty": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string",
+          "description": "Profile name to use as base"
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "additionalProperties": false,
+      "description": "Model config that references a profile with optional overrides. Example: { profile: \"fast-cheap\", temperature: 0.8 }"
     },
     "OutputSchema": {
       "type": "object",
