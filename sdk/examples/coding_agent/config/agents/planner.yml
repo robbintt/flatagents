@@ -44,8 +44,26 @@ data:
     ## Task
     {{ input.task }}
     
-    ## Codebase Context
-    {{ input.codebase_context | default("No codebase context available yet.") }}
+    ## Codebase Summary
+    {{ input.codebase_context | default("No codebase summary available.") }}
+    
+    {% if input.frozen_signatures %}
+    ## Code Signatures Found
+    {% for sig in input.frozen_signatures %}
+    {{ sig }}
+    {% endfor %}
+    {% endif %}
+    
+    {% if input.file_contents %}
+    ## File Contents
+    {% for path, content in input.file_contents.items() %}
+    ### {{ path }}
+    ```
+    {{ content[:3000] }}{% if content|length > 3000 %}
+    ... (truncated){% endif %}
+    ```
+    {% endfor %}
+    {% endif %}
     
     {% if input.previous_plans %}
     ## Previous Plans (Rejected)
@@ -63,7 +81,7 @@ data:
     {{ input.feedback }}
     {% endif %}
     
-    Generate a detailed implementation plan in plain text.
+    Generate a detailed implementation plan in plain text. Reference the actual files and signatures found above.
 
 metadata:
   description: "Plans implementation steps for coding tasks"

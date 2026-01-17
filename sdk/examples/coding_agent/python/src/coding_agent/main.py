@@ -48,10 +48,10 @@ async def run(task: str, cwd: str = ".", max_iterations: int = 5):
     # Capture actual directory user ran from (for safety checks)
     user_cwd = Path.cwd().resolve()
     
-    # Create machine with hooks
+    # Create machine with hooks (passing working_dir for exploration tools)
     machine = FlatMachine(
         config_file=str(config_path),
-        hooks=CodingAgentHooks()
+        hooks=CodingAgentHooks(working_dir=str(working_dir))
     )
 
     logger.info(f"Machine: {machine.machine_name}")

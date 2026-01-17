@@ -67,8 +67,20 @@ data:
     ## Plan
     {{ input.plan }}
     
-    ## Context
+    ## Directory Structure
     {{ input.codebase_context | default("None") }}
+    
+    {% if input.file_contents %}
+    ## File Contents
+    The following files have been read for you. Use their exact content for SEARCH sections:
+    {% for path, content in input.file_contents.items() %}
+    
+    ### {{ path }}
+    ```
+    {{ content }}
+    ```
+    {% endfor %}
+    {% endif %}
     
     {% if input.previous_changes %}
     ## Rejected Changes
@@ -83,7 +95,7 @@ data:
     {{ input.feedback }}
     {% endif %}
     
-    Output diff blocks to implement the plan.
+    Output diff blocks to implement the plan. The SEARCH sections must match the file content exactly.
 
 metadata:
   description: "Implements code changes using diff blocks"

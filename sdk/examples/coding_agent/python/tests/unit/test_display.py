@@ -54,10 +54,10 @@ class TestDisplayFunctions:
         
         assert result['result_approved'] is True
     
-    # === Test 3: Long content truncation ===
-    def test_long_content_truncation(self, hooks, capsys):
-        """Test that long plan content is truncated for display."""
-        # Create a plan with more than 80 lines
+    # === Test 3: Long content is fully displayed ===
+    def test_long_content_fully_displayed(self, hooks, capsys):
+        """Test that long plan content is fully displayed without truncation."""
+        # Create a plan with many lines
         long_plan = '\n'.join([f'Line {i}: Some content here' for i in range(100)])
         
         context = {
@@ -70,8 +70,8 @@ class TestDisplayFunctions:
             hooks._human_review_plan(context)
         
         captured = capsys.readouterr()
-        # Should indicate truncation
-        assert 'more lines' in captured.out
+        # Should show all lines without truncation
+        assert 'Line 99' in captured.out  # Last line should be present
     
     # === Additional display tests ===
     

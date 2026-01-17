@@ -8,6 +8,7 @@ See local/flatmachines-plan.md for the full specification.
 """
 
 import asyncio
+import importlib
 import json
 import os
 import re
@@ -141,8 +142,8 @@ class FlatMachine:
         expression_mode = self.data.get("expression_engine", "simple")
         self._expression_engine = get_expression_engine(expression_mode)
 
-        # Hooks
-        self._hooks = hooks or MachineHooks()
+        # Hooks - load from config or use provided/default
+        self._hooks = self._load_hooks(hooks)
 
         # Agent cache
         self._agents: Dict[str, FlatAgent] = {}
@@ -305,6 +306,90 @@ class FlatMachine:
             else:
                 raise ValueError("No states defined")
 
+    def _load_hooks(self, hooks: Optional[MachineHooks]) -> MachineHooks:
+        """
+        Load hooks from config or use provided/default.
+        
+        Config format (file-based, preferred for self-contained skills):
+            hooks:
+              file: "./hooks.py"
+              class: "MyHooks"
+              args:
+                working_dir: "."
+        
+        Config format (module-based, for installed packages):
+            hooks:
+              module: "mypackage.hooks"
+              class: "MyHooks"
+              args:
+                working_dir: "{{ input.working_dir }}"
+        
+        Priority:
+        1. Explicitly passed hooks argument (for programmatic use)
+        2. file: in config (file-based loading)
+        3. module: in config (Python import)
+        4. Default MachineHooks()
+        """
+        # If hooks explicitly passed, use them
+        if hooks is not None:
+            return hooks
+        
+        # Check for hooks config
+        hooks_config = self.data.get('hooks')
+        if not hooks_config:
+            return MachineHooks()
+        
+        class_name = hooks_config.get('class')
+        if not class_name:
+            logger.warning(
+                f"Hooks config missing 'class', using default. Config: {hooks_config}"
+            )
+            return MachineHooks()
+        
+        hooks_class = None
+        
+        # Try file-based loading first (for self-contained skills)
+        file_path = hooks_config.get('file')
+        if file_path:
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(self._config_dir, file_path)
+            try:
+                spec = importlib.util.spec_from_file_location("hooks", file_path)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    hooks_class = getattr(module, class_name)
+            except Exception as e:
+                logger.error(f"Failed to load hooks from file {file_path}: {e}")
+        
+        # Fall back to module import
+        if hooks_class is None:
+            module_name = hooks_config.get('module')
+            if not module_name:
+                logger.warning(
+                    f"Hooks config has no 'file' or 'module', using default. "
+                    f"Config: {hooks_config}"
+                )
+                return MachineHooks()
+            try:
+                module = importlib.import_module(module_name)
+                hooks_class = getattr(module, class_name)
+            except (ImportError, AttributeError) as e:
+                logger.error(
+                    f"Failed to load hooks class {class_name} from {module_name}: {e}"
+                )
+                return MachineHooks()
+        
+        # Get args (note: can't render templates here as input not yet available)
+        # Args are passed raw - the hooks class should handle any needed resolution
+        hooks_args = hooks_config.get('args', {})
+        
+        try:
+            return hooks_class(**hooks_args)
+        except Exception as e:
+            logger.error(f"Failed to instantiate hooks class {class_name}: {e}")
+            return MachineHooks()
+
     def _get_agent(self, agent_name: str) -> FlatAgent:
         """Get or load an agent by name."""
         if agent_name in self._agents:
@@ -464,14 +549,21 @@ class FlatMachine:
         
         raise ValueError(f"Invalid reference type: {type(ref)}")
 
-    def _resolve_machine_config(self, name: str) -> Dict[str, Any]:
-        """Resolve a machine reference to a config dict."""
+    def _resolve_machine_config(self, name: str) -> tuple[Dict[str, Any], str]:
+        """
+        Resolve a machine reference to a config dict and its config directory.
+        
+        Returns:
+            Tuple of (config_dict, config_dir) where config_dir is the directory
+            containing the machine config file (for resolving relative paths).
+        """
         ref = self.machine_refs.get(name)
         if not ref:
             raise ValueError(f"Unknown machine reference: {name}. Check 'machines:' section in config.")
 
         if isinstance(ref, dict):
-            return ref
+            # Inline config - use parent's config_dir
+            return ref, self._config_dir
 
         if isinstance(ref, str):
             path = ref
@@ -481,12 +573,18 @@ class FlatMachine:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Machine config file not found: {path}")
 
+            # The peer's config_dir is the directory containing its config file
+            peer_config_dir = os.path.dirname(os.path.abspath(path))
+
             with open(path, 'r') as f:
                 if path.endswith('.json'):
-                    return json.load(f) or {}
-                if yaml:
-                    return yaml.safe_load(f) or {}
-                raise ImportError("pyyaml required for YAML files")
+                    config = json.load(f) or {}
+                elif yaml:
+                    config = yaml.safe_load(f) or {}
+                else:
+                    raise ImportError("pyyaml required for YAML files")
+            
+            return config, peer_config_dir
         
         raise ValueError(f"Invalid machine reference type: {type(ref)}")
 
@@ -556,13 +654,15 @@ class FlatMachine:
         input_data: Dict[str, Any]
     ) -> Any:
         """Launch a peer machine and write its result to the backend."""
-        target_config = self._resolve_machine_config(machine_name)
+        target_config, peer_config_dir = self._resolve_machine_config(machine_name)
 
+        # Peer machines are independent - they load their own hooks from config
+        # (via the hooks: section in their machine.yml)
+        # Use peer's config_dir so relative paths (e.g., ./agents/judge.yml) resolve correctly
         peer = FlatMachine(
             config_dict=target_config,
-            hooks=self._hooks,
             result_backend=self.result_backend,
-            _config_dir=self._config_dir,
+            _config_dir=peer_config_dir,
             _execution_id=child_id,
             _parent_execution_id=self.execution_id,
         )
@@ -752,7 +852,7 @@ class FlatMachine:
         """
         for machine_name in machines:
             child_id = str(uuid.uuid4())
-            target_config = self._resolve_machine_config(machine_name)
+            target_config, _ = self._resolve_machine_config(machine_name)
             
             # Record intent before launch (outbox pattern)
             self._add_pending_launch(child_id, machine_name, input_data)

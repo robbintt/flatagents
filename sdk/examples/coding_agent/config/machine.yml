@@ -8,6 +8,13 @@ spec_version: "0.4.0"
 data:
   name: coding-agent
   
+  # Hooks class for this machine's actions (exploration, review, apply)
+  hooks:
+    module: coding_agent.hooks
+    class: CodingAgentHooks
+    args:
+      working_dir: "."
+  
   context:
     # Input from user
     task: "{{ input.task }}"
@@ -20,6 +27,7 @@ data:
     changes: null
     changes_history: []   # Preserve rejected changes
     issues: null
+    file_contents: {}     # Files read for coder context
     
     # Control flow
     iteration: 0
@@ -33,6 +41,9 @@ data:
     coder: ./agents/coder.yml
     reviewer: ./agents/reviewer.yml
   
+  machines:
+    explorer: ../.skills/codebase_explorer/machine.yml
+  
   states:
     # Entry point
     start:
@@ -40,9 +51,20 @@ data:
       transitions:
         - to: explore_codebase
     
-    # Gather context about the codebase
+    # Gather context about the codebase using codebase_explorer skill
     explore_codebase:
-      action: explore_codebase
+      machine: explorer
+      input:
+        task: "{{ context.task }}"
+        working_dir: "{{ context.working_dir }}"
+        token_budget: 40000
+        max_iterations: 10
+      output_to_context:
+        summary: "{{ output.summary }}"
+        frozen_signatures: "{{ output.frozen_signatures }}"
+        frozen_segments: "{{ output.frozen_segments }}"
+        file_contents: "{{ output.file_contents }}"
+        codebase_context: "{{ output.summary }}"
       transitions:
         - to: plan_changes
     
@@ -55,6 +77,8 @@ data:
       input:
         task: "{{ context.task }}"
         codebase_context: "{{ context.codebase_context }}"
+        frozen_signatures: "{{ context.frozen_signatures }}"
+        file_contents: "{{ context.file_contents }}"
         previous_plans: "{{ context.plan_history }}"
         feedback: "{{ context.human_feedback }}"
       output_to_context:
@@ -67,10 +91,16 @@ data:
       action: human_review_plan
       transitions:
         - condition: "context.plan_approved == true"
-          to: execute_plan
+          to: read_plan_files  # Read files before executing
         - condition: "context.iteration >= context.max_iterations"
           to: max_iterations
         - to: plan_changes  # Loop back with feedback
+    
+    # Read files mentioned in plan for coder context
+    read_plan_files:
+      action: read_plan_files
+      transitions:
+        - to: execute_plan
     
     # Apply the plan
     execute_plan:
@@ -81,6 +111,7 @@ data:
       input:
         plan: "{{ context.plan }}"
         codebase_context: "{{ context.codebase_context }}"
+        file_contents: "{{ context.file_contents }}"
         previous_changes: "{{ context.changes_history }}"
         feedback: "{{ context.human_feedback }}"
       output_to_context:
