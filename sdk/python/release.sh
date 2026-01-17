@@ -132,8 +132,13 @@ echo "✓ MACHINES.md synced from root"
 
 # Extract versions from root TypeScript specs
 echo "Extracting spec versions from TypeScript files..."
-FLATAGENT_VERSION=$(npx -y tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatagent.d.ts")
-FLATMACHINE_VERSION=$(npx -y tsx "$REPO_ROOT/scripts/generate-spec-assets.ts" --extract-version "$REPO_ROOT/flatmachine.d.ts")
+# Ensure dependencies are installed
+if [ ! -d "$REPO_ROOT/scripts/node_modules" ]; then
+    echo "Installing script dependencies..."
+    (cd "$REPO_ROOT/scripts" && npm install --silent)
+fi
+FLATAGENT_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagent.d.ts")
+FLATMACHINE_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatmachine.d.ts")
 
 echo "TypeScript spec versions:"
 echo "  flatagent.d.ts:   $FLATAGENT_VERSION"
