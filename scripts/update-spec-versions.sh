@@ -14,6 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NEW_VERSION=""
 DRY_RUN=true
 UPDATE_PYTHON=false
+UPDATE_EXAMPLES=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -23,6 +24,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --python)
             UPDATE_PYTHON=true
+            shift
+            ;;
+        --examples)
+            UPDATE_EXAMPLES=true
             shift
             ;;
         --*)
@@ -50,14 +55,15 @@ if [[ -z "$NEW_VERSION" ]]; then
     echo "Usage: update-spec-versions.sh <new-version> [options]"
     echo ""
     echo "Options:"
-    echo "  --apply    Actually apply changes (default is dry-run)"
-    echo "  --python   Also update Python SDK and examples"
+    echo "  --apply     Actually apply changes (default is dry-run)"
+    echo "  --python    Also update Python SDK"
+    echo "  --examples  Also update shared examples (sdk/examples/*/config/*.yml)"
     echo ""
     echo "What gets updated:"
-    echo "  Always:    Root .d.ts specs, README.md, MACHINES.md"
-    echo "  --python:  sdk/python/pyproject.toml, sdk/python/flatagents/__init__.py,"
-    echo "             sdk/python/examples/**/config/*.yml,"
-    echo "             sdk/examples/*/python/config/*.yml"
+    echo "  Always:     Root .d.ts specs, README.md, MACHINES.md"
+    echo "  --python:   sdk/python/pyproject.toml, sdk/python/flatagents/__init__.py,"
+    echo "              sdk/python/examples/**/config/*.yml"
+    echo "  --examples: sdk/examples/**/*.yml"
     echo ""
     echo "NOT updated (generated from sources):"
     echo "  - assets/*.d.ts (run scripts/generate-spec-assets.sh)"
@@ -66,7 +72,7 @@ if [[ -z "$NEW_VERSION" ]]; then
     echo "Examples:"
     echo "  update-spec-versions.sh 0.8.0              # dry-run, specs only"
     echo "  update-spec-versions.sh 0.8.0 --apply      # apply specs only"
-    echo "  update-spec-versions.sh 0.8.0 --python --apply"
+    echo "  update-spec-versions.sh 0.8.0 --python --examples --apply"
     exit 1
 fi
 
@@ -81,6 +87,7 @@ fi
 
 echo "Target version: $NEW_VERSION"
 echo "Update Python SDK: $UPDATE_PYTHON"
+echo "Update shared examples: $UPDATE_EXAMPLES"
 echo ""
 
 cd "$REPO_ROOT"
@@ -150,12 +157,20 @@ if [[ "$UPDATE_PYTHON" == true ]]; then
         update_file "$file" "(spec_version:[[:space:]]*[\"']?)[0-9]+\.[0-9]+\.[0-9]+([\"']?)" "\1$NEW_VERSION\2"
     done < <(find sdk/python/examples -path "*/config/*.yml" -type f 2>/dev/null || true)
     echo ""
+fi
 
-    # Shared examples (Python)
-    echo "Shared examples - Python (sdk/examples/*/python/config/*.yml):"
+# =============================================================================
+# 4. SHARED EXAMPLES (if --examples)
+# =============================================================================
+if [[ "$UPDATE_EXAMPLES" == true ]]; then
+    echo "Shared examples (sdk/examples/**/*.yml):"
     while IFS= read -r file; do
+        # Skip common non-spec directories
+        if [[ "$file" == *".venv"* ]] || [[ "$file" == *"node_modules"* ]]; then
+            continue
+        fi
         update_file "$file" "(spec_version:[[:space:]]*[\"']?)[0-9]+\.[0-9]+\.[0-9]+([\"']?)" "\1$NEW_VERSION\2"
-    done < <(find sdk/examples -path "*/python/config/*.yml" -type f 2>/dev/null || true)
+    done < <(find sdk/examples -name "*.yml" -type f 2>/dev/null || true)
     echo ""
 fi
 
@@ -175,6 +190,9 @@ else
     echo "  2. Run 'scripts/lint-spec-versions.sh' to verify"
     if [[ "$UPDATE_PYTHON" == true ]]; then
         echo "  3. Run 'sdk/python/release.sh' to build & verify Python SDK"
+    fi
+    if [[ "$UPDATE_EXAMPLES" == true ]]; then
+        echo "  Note: Test shared examples with your SDK of choice"
     fi
 fi
 echo "════════════════════════════════════════════════════════════"
