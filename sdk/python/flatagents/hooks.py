@@ -15,6 +15,7 @@ import time
 from abc import ABC
 from typing import Any, Dict, Optional
 
+from . import __version__
 from .monitoring import get_logger
 
 logger = get_logger(__name__)
@@ -294,7 +295,7 @@ class WebhookHooks(MachineHooks):
         self.timeout = timeout
         self.headers = {
             "Content-Type": "application/json",
-            "User-Agent": "FlatAgents/0.1.0"
+            "User-Agent": f"FlatAgents/{__version__}"
         }
         if api_key:
             self.headers["Authorization"] = f"Bearer {api_key}"

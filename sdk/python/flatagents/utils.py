@@ -1,6 +1,35 @@
 """Utility functions for flatagents."""
 
 import re
+from typing import Optional
+
+from .monitoring import get_logger
+
+logger = get_logger(__name__)
+
+
+def check_spec_version(config_version: Optional[str], sdk_version: str) -> str:
+    """
+    Check spec version compatibility and warn if mismatched.
+
+    Args:
+        config_version: Version from config file (may be None)
+        sdk_version: Current SDK version (__version__)
+
+    Returns:
+        The effective spec version (config_version or sdk_version as default)
+    """
+    effective_version = config_version or sdk_version
+    sdk_major_minor = '.'.join(sdk_version.split('.')[:2])
+    config_major_minor = '.'.join(effective_version.split('.')[:2])
+
+    if config_major_minor != sdk_major_minor:
+        logger.warning(
+            f"Config version {effective_version} may not be fully supported. "
+            f"Current SDK version is {sdk_version}."
+        )
+
+    return effective_version
 
 
 def strip_markdown_json(content: str) -> str:

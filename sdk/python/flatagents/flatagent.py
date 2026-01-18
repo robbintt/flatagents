@@ -12,8 +12,9 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+from . import __version__
 from .monitoring import get_logger
-from .utils import strip_markdown_json
+from .utils import strip_markdown_json, check_spec_version
 from .baseagent import (
     FlatAgent as BaseFlatAgent,
     LLMBackend,
@@ -114,7 +115,6 @@ class FlatAgent:
                 # Handle tool result...
     """
 
-    SPEC_VERSION = "0.7.0"
     DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
     def __init__(
@@ -333,13 +333,7 @@ class FlatAgent:
             raise ValueError("Config missing 'data' section")
 
         # Version check with warning
-        self.spec_version = config.get('spec_version', '0.7.0')
-        major_minor = '.'.join(self.spec_version.split('.')[:2])
-        if major_minor not in ['0.5', '0.6', '0.7']:
-            logger.warning(
-                f"Config version {self.spec_version} may not be fully supported. "
-                f"Current SDK supports 0.5.x - 0.7.x."
-            )
+        self.spec_version = check_spec_version(config.get('spec_version'), __version__)
 
         # Schema validation (warnings only, non-blocking)
         try:

@@ -105,7 +105,7 @@
  * ----------------------
  *
  *   spec: flatmachine
- *   spec_version: "0.4.0"
+ *   spec_version: "0.7.0"
  *
  *   data:
  *     name: writer-critic-loop
@@ -256,7 +256,7 @@
  * pending_launches    - Outbox pattern (v0.4.0)
  */
 
-export const SPEC_VERSION = "0.4.0";
+export const SPEC_VERSION = "0.7.0";
 
 export interface MachineWrapper {
   spec: "flatmachine";

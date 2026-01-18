@@ -74,7 +74,7 @@
  * ----------------------
  *
  *   spec: flatagents
- *   spec_version: "0.0.0"
+ *   spec_version: "0.7.0"
  *
  *   data:
  *     name: critic

@@ -107,7 +107,7 @@ Centralize model configurations in `profiles.yml` and reference them by name:
 **profiles.yml**
 ```yaml
 spec: flatprofiles
-spec_version: "0.1.0"
+spec_version: "0.7.0"
 
 data:
   model_profiles:

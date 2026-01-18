@@ -52,7 +52,7 @@
  * ----------------------
  *
  *   spec: flatprofiles
- *   spec_version: "0.1.0"
+ *   spec_version: "0.7.0"
  *
  *   data:
  *     model_profiles:
@@ -107,7 +107,7 @@
  * base_url          - Custom base URL for the API (e.g., for local models or proxies)
  */
 
-export const SPEC_VERSION = "0.1.0";
+export const SPEC_VERSION = "0.7.0";
 
 export interface ProfilesWrapper {
   spec: "flatprofiles";

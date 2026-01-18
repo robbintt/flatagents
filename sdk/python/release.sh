@@ -110,7 +110,7 @@ if [[ "$UPDATED_INIT_VERSION" != "$PYPROJECT_VERSION" ]]; then
 fi
 
 # Copy root TypeScript specs to sdk assets
-cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$ASSETS_DIR/"
+cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$REPO_ROOT/profiles.d.ts" "$ASSETS_DIR/"
 
 # Copy root README and MACHINES.md for PyPI (hatchling requires readme in package dir)
 cp "$REPO_ROOT/README.md" "$SDK_DIR/README.md"
@@ -139,43 +139,45 @@ if [ ! -d "$REPO_ROOT/scripts/node_modules" ]; then
 fi
 FLATAGENT_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagent.d.ts")
 FLATMACHINE_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatmachine.d.ts")
+PROFILES_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/profiles.d.ts")
 
 echo "TypeScript spec versions:"
 echo "  flatagent.d.ts:   $FLATAGENT_VERSION"
 echo "  flatmachine.d.ts: $FLATMACHINE_VERSION"
+echo "  profiles.d.ts:    $PROFILES_VERSION"
 echo ""
 
-# Extract versions from Python SDK
-echo "Checking Python SDK versions..."
-SDK_FLATAGENT_VERSION=$(grep -E '^\s*SPEC_VERSION\s*=\s*' flatagents/flatagent.py | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"')
-SDK_FLATMACHINE_VERSION=$(grep -E '^\s*SPEC_VERSION\s*=\s*' flatagents/flatmachine.py | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"')
+# Validate SDK __version__ matches spec versions (all specs unified to same version)
+echo "Checking Python SDK version..."
+echo "  __version__: $PYPROJECT_VERSION"
 
-echo "Python SDK versions:"
-echo "  flatagent.py:   $SDK_FLATAGENT_VERSION"
-echo "  flatmachine.py: $SDK_FLATMACHINE_VERSION"
-echo ""
-
-# Validate versions match
 FAILED=0
 
-if [[ "$SDK_FLATAGENT_VERSION" != "$FLATAGENT_VERSION" ]]; then
-    echo "  ✗ flatagent.py version ($SDK_FLATAGENT_VERSION) != spec version ($FLATAGENT_VERSION)"
+if [[ "$PYPROJECT_VERSION" != "$FLATAGENT_VERSION" ]]; then
+    echo "  ✗ SDK version ($PYPROJECT_VERSION) != flatagent.d.ts ($FLATAGENT_VERSION)"
     FAILED=1
 else
-    echo "  ✓ flatagent.py matches spec ($FLATAGENT_VERSION)"
+    echo "  ✓ SDK version matches flatagent.d.ts ($FLATAGENT_VERSION)"
 fi
 
-if [[ "$SDK_FLATMACHINE_VERSION" != "$FLATMACHINE_VERSION" ]]; then
-    echo "  ✗ flatmachine.py version ($SDK_FLATMACHINE_VERSION) != spec version ($FLATMACHINE_VERSION)"
+if [[ "$PYPROJECT_VERSION" != "$FLATMACHINE_VERSION" ]]; then
+    echo "  ✗ SDK version ($PYPROJECT_VERSION) != flatmachine.d.ts ($FLATMACHINE_VERSION)"
     FAILED=1
 else
-    echo "  ✓ flatmachine.py matches spec ($FLATMACHINE_VERSION)"
+    echo "  ✓ SDK version matches flatmachine.d.ts ($FLATMACHINE_VERSION)"
+fi
+
+if [[ "$PYPROJECT_VERSION" != "$PROFILES_VERSION" ]]; then
+    echo "  ✗ SDK version ($PYPROJECT_VERSION) != profiles.d.ts ($PROFILES_VERSION)"
+    FAILED=1
+else
+    echo "  ✓ SDK version matches profiles.d.ts ($PROFILES_VERSION)"
 fi
 
 if [[ "$FAILED" -eq 1 ]]; then
     echo ""
     echo "RELEASE ABORTED: SDK version mismatch with TypeScript specs."
-    echo "Update SPEC_VERSION in flatagent.py and/or flatmachine.py to match."
+    echo "Update version in pyproject.toml to match spec versions."
     exit 1
 fi
 
@@ -190,7 +192,7 @@ echo ""
 echo "Verifying spec assets..."
 FAILED=0
 
-for file in flatagent.d.ts flatmachine.d.ts; do
+for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts; do
     if [ ! -f "$ASSETS_DIR/$file" ]; then
         echo "  ✗ $file (missing)"
         FAILED=1
@@ -202,8 +204,8 @@ for file in flatagent.d.ts flatmachine.d.ts; do
     fi
 done
 
-for file in flatagent.slim.d.ts flatmachine.slim.d.ts \
-            flatagent.schema.json flatmachine.schema.json; do
+for file in flatagent.slim.d.ts flatmachine.slim.d.ts profiles.slim.d.ts \
+            flatagent.schema.json flatmachine.schema.json profiles.schema.json; do
     if [ ! -f "$ASSETS_DIR/$file" ]; then
         echo "  ✗ $file (missing)"
         FAILED=1

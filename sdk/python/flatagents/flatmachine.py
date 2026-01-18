@@ -24,7 +24,9 @@ try:
 except ImportError:
     yaml = None
 
+from . import __version__
 from .monitoring import get_logger
+from .utils import check_spec_version
 from .expressions import get_expression_engine, ExpressionEngine
 from .execution import get_execution_type, ExecutionType
 from .hooks import MachineHooks, LoggingHooks
@@ -69,8 +71,6 @@ class FlatMachine:
     - Concurrency control (locking)
     - Machine launching (peer machine execution)
     """
-
-    SPEC_VERSION = "0.4.0"
 
     def __init__(
         self,
@@ -263,13 +263,7 @@ class FlatMachine:
             raise ValueError("Config missing 'data' section")
 
         # Version check with warning
-        self.spec_version = self.config.get('spec_version', '0.1.0')
-        major_minor = '.'.join(self.spec_version.split('.')[:2])
-        if major_minor not in ['0.1']:
-            logger.warning(
-                f"Config version {self.spec_version} may not be fully supported. "
-                f"Current SDK supports 0.1.x."
-            )
+        self.spec_version = check_spec_version(self.config.get('spec_version'), __version__)
 
         # Schema validation (warnings only, non-blocking)
         try:
@@ -1033,7 +1027,7 @@ class FlatMachine:
         snapshot = MachineSnapshot(
             execution_id=self.execution_id,
             machine_name=self.machine_name,
-            spec_version=self.SPEC_VERSION,
+            spec_version=self.spec_version,
             current_state=state_name,
             context=context,
             step=step,
