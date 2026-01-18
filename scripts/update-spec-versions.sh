@@ -101,11 +101,11 @@ update_file() {
 
     if [[ "$DRY_RUN" == true ]]; then
         echo "  Would update: $file"
-        ((WOULD_UPDATE++))
+        ((++WOULD_UPDATE))
     else
         sed -i '' -E "s/$pattern/$replacement/" "$file"
         echo "  Updated: $file"
-        ((UPDATED++))
+        ((++UPDATED))
     fi
 }
 

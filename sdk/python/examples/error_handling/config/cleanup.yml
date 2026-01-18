@@ -1,5 +1,5 @@
 spec: flatagent
-spec_version: "0.7.0"
+spec_version: "0.7.1"
 
 data:
   name: cleanup
