@@ -16,6 +16,10 @@ Define LLM agents in YAML. Run them anywhere.
 
 *Inspired by Kubernetes manifests and character card specifications.*
 
+## Versioning
+
+All specs (`flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts`) and SDKs (Python, JS) use **lockstep versioning**. A single version number (e.g., `0.7.0`) applies across the entire repository.
+
 ## Core Concepts
 
 Use machines to write flatagents and flatmachines, they are designed for LLMs.

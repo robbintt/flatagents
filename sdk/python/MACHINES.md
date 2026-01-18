@@ -1,6 +1,8 @@
 # FlatAgents + FlatMachines Reference
 
 > **Target: <1000 tokens.** LLM-optimized. See `flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts` for schemas.
+>
+> **Versioning:** All specs and SDKs use lockstep versioning (currently `0.7.0`).
 
 ## Concepts
 
@@ -15,12 +17,12 @@
 | Dynamic parallelism | `foreach` |
 | Background tasks | `launch` |
 
-## Model Profiles (v0.7.0)
+## Model Profiles
 
 ```yaml
 # profiles.yml — agents reference by name
 spec: flatprofiles
-spec_version: "0.1.0"
+spec_version: "0.7.0"
 data:
   model_profiles:
     fast: { provider: cerebras, name: zai-glm-4.6, temperature: 0.6 }
