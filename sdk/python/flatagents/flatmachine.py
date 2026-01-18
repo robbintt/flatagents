@@ -112,11 +112,15 @@ class FlatMachine:
         self._profiles_file = profiles_file or kwargs.pop('_profiles_file', None)
 
         self._load_config(config_file, config_dict)
-        
+
         # Allow launcher to override config_dir for launched machines
         if config_dir_override:
             self._config_dir = config_dir_override
-        
+
+        # Auto-discover profiles.yml in config_dir if not explicitly provided
+        from .profiles import discover_profiles_file
+        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+
         # Merge kwargs into config data (shallow merge)
         if kwargs and 'data' in self.config:
             self.config['data'].update(kwargs)

@@ -237,7 +237,28 @@ def resolve_model_config(
     return manager.resolve_model_config(agent_model_config)
 
 
+def discover_profiles_file(config_dir: str, explicit_path: Optional[str] = None) -> Optional[str]:
+    """
+    Discover profiles.yml in config_dir if not explicitly provided.
+
+    This is used by FlatAgent and FlatMachine to auto-discover profiles.yml
+    and propagate it to child agents/machines.
+
+    Args:
+        config_dir: Directory to search for profiles.yml
+        explicit_path: Explicit path if already provided (returned as-is)
+
+    Returns:
+        Path to profiles.yml if found, explicit_path if provided, or None
+    """
+    if explicit_path:
+        return explicit_path
+    default_path = os.path.join(config_dir, 'profiles.yml')
+    return default_path if os.path.exists(default_path) else None
+
+
 __all__ = [
     "ProfileManager",
     "resolve_model_config",
+    "discover_profiles_file",
 ]

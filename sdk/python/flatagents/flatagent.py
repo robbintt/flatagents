@@ -285,6 +285,10 @@ class FlatAgent:
         self.config = config
         self._config_dir = config_dir
 
+        # Auto-discover profiles.yml in config_dir if not explicitly provided
+        from .profiles import discover_profiles_file
+        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+
         # Extract model config from data section
         data = config.get('data', {})
         raw_model_config = data.get('model', {})
