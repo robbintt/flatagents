@@ -18,7 +18,7 @@ Define LLM agents in YAML. Run them anywhere.
 
 ## Versioning
 
-All specs (`flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts`) and SDKs (Python, JS) use **lockstep versioning**. A single version number (e.g., `0.7.0`) applies across the entire repository.
+All specs (`flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts`) and SDKs (Python, JS) use **lockstep versioning**. A single version number applies across the entire repository.
 
 ## Core Concepts
 

@@ -2,7 +2,7 @@
 
 > **Target: <1000 tokens.** LLM-optimized. See `flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts` for schemas.
 >
-> **Versioning:** All specs and SDKs use lockstep versioning (currently `0.7.0`).
+> **Versioning:** All specs and SDKs use lockstep versioning.
 
 ## Concepts
 
