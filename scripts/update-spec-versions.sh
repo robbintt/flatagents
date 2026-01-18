@@ -96,15 +96,18 @@ cd "$REPO_ROOT"
 UPDATED=0
 WOULD_UPDATE=0
 
-# Helper function
+# Update file if it needs updating (pattern matches but not already at target)
 update_file() {
     local file="$1"
     local pattern="$2"
     local replacement="$3"
+    # Escape dots for literal matching in version check
+    local escaped_version="${NEW_VERSION//./\\.}"
+    local target_check="${4:-$escaped_version}"
 
-    if [[ ! -f "$file" ]]; then
-        return
-    fi
+    [[ -f "$file" ]] || return
+    rg -q "$pattern" "$file" 2>/dev/null || return  # Pattern not found
+    rg -q "$target_check" "$file" 2>/dev/null && return  # Already at target
 
     if [[ "$DRY_RUN" == true ]]; then
         echo "  Would update: $file"
@@ -116,11 +119,26 @@ update_file() {
     fi
 }
 
+# Update yml files in a directory that have outdated spec_version
+update_yml_files() {
+    local search_path="$1"
+    local pattern="(spec_version:[[:space:]]*[\"']?)[0-9]+\.[0-9]+\.[0-9]+([\"']?)"
+    local escaped_version="${NEW_VERSION//./\\.}"
+
+    # Find files with spec_version not at target version
+    while read -r file; do
+        # Skip if already at target version or in excluded dirs
+        [[ "$file" == *".venv"* || "$file" == *"node_modules"* ]] && continue
+        rg -q "spec_version.*$escaped_version" "$file" 2>/dev/null && continue
+        update_file "$file" "$pattern" "\1$NEW_VERSION\2"
+    done < <(rg -l 'spec_version.*[0-9]+\.[0-9]+\.[0-9]+' "$search_path" --glob '*.yml' 2>/dev/null)
+}
+
 # =============================================================================
 # 1. ROOT .d.ts SPECS (source of truth)
 # =============================================================================
 echo "Root .d.ts specs:"
-for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts; do
+for file in flatagent.d.ts flatmachine.d.ts flatagents-runtime.d.ts profiles.d.ts; do
     update_file "$file" "(SPEC_VERSION = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
 done
 echo ""
@@ -148,14 +166,8 @@ if [[ "$UPDATE_PYTHON" == true ]]; then
     echo ""
 
     # Python SDK examples
-    echo "Python SDK examples (sdk/python/examples/**/config/*.yml):"
-    while IFS= read -r file; do
-        # Skip .venv
-        if [[ "$file" == *".venv"* ]]; then
-            continue
-        fi
-        update_file "$file" "(spec_version:[[:space:]]*[\"']?)[0-9]+\.[0-9]+\.[0-9]+([\"']?)" "\1$NEW_VERSION\2"
-    done < <(find sdk/python/examples -path "*/config/*.yml" -type f 2>/dev/null || true)
+    echo "Python SDK examples (sdk/python/examples/**/*.yml):"
+    update_yml_files "sdk/python/examples"
     echo ""
 fi
 
@@ -164,13 +176,7 @@ fi
 # =============================================================================
 if [[ "$UPDATE_EXAMPLES" == true ]]; then
     echo "Shared examples (sdk/examples/**/*.yml):"
-    while IFS= read -r file; do
-        # Skip common non-spec directories
-        if [[ "$file" == *".venv"* ]] || [[ "$file" == *"node_modules"* ]]; then
-            continue
-        fi
-        update_file "$file" "(spec_version:[[:space:]]*[\"']?)[0-9]+\.[0-9]+\.[0-9]+([\"']?)" "\1$NEW_VERSION\2"
-    done < <(find sdk/examples -name "*.yml" -type f 2>/dev/null || true)
+    update_yml_files "sdk/examples"
     echo ""
 fi
 

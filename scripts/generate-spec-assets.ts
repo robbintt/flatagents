@@ -32,6 +32,7 @@ const SPECS: SpecConfig[] = [
   { filename: "flatagent.d.ts", rootType: "AgentWrapper" },
   { filename: "flatmachine.d.ts", rootType: "MachineWrapper" },
   { filename: "profiles.d.ts", rootType: "ProfilesWrapper" },
+  { filename: "flatagents-runtime.d.ts", rootType: "SDKRuntimeWrapper" },
 ];
 
 /**

@@ -116,7 +116,7 @@ if [[ "$UPDATED_INIT_VERSION" != "$PYPROJECT_VERSION" ]]; then
     exit 1
 fi
 
-# Copy root TypeScript specs to sdk assets
+# Copy root TypeScript specs to sdk assets, except the sdk spec, which is not included at this time.
 cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$REPO_ROOT/profiles.d.ts" "$ASSETS_DIR/"
 
 # Copy root README and MACHINES.md for PyPI (hatchling requires readme in package dir)
