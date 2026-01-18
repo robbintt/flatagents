@@ -135,7 +135,9 @@ class FlatAgent:
         self._parse_agent_config()
 
         # Determine backend: explicit param > config > auto-detect
-        config_backend = self.config.get('data', {}).get('model', {}).get('backend')
+        # model can be a string (profile name) or dict (inline config)
+        model_config = self.config.get('data', {}).get('model', {})
+        config_backend = model_config.get('backend') if isinstance(model_config, dict) else None
         self._backend = backend or config_backend or self._auto_detect_backend()
         self._init_backend()
 
