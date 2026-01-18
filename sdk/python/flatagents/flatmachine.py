@@ -108,7 +108,8 @@ class FlatMachine:
         # Extract _config_dir override (used for launched machines)
         config_dir_override = kwargs.pop('_config_dir', None)
 
-        # Store profiles file for agent instantiation
+        # Store profiles for agent instantiation (dict takes precedence over file)
+        self._profiles_dict = kwargs.pop('_profiles_dict', None)
         self._profiles_file = profiles_file or kwargs.pop('_profiles_file', None)
 
         self._load_config(config_file, config_dict)
@@ -117,9 +118,12 @@ class FlatMachine:
         if config_dir_override:
             self._config_dir = config_dir_override
 
-        # Auto-discover profiles.yml in config_dir if not explicitly provided
-        from .profiles import discover_profiles_file
-        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+        # Load profiles: use dict if provided, otherwise discover and load from file
+        if not self._profiles_dict:
+            from .profiles import discover_profiles_file, load_profiles_from_file
+            self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+            if self._profiles_file:
+                self._profiles_dict = load_profiles_from_file(self._profiles_file)
 
         # Merge kwargs into config data (shallow merge)
         if kwargs and 'data' in self.config:
@@ -407,10 +411,10 @@ class FlatMachine:
         if isinstance(agent_ref, str):
             if not os.path.isabs(agent_ref):
                 agent_ref = os.path.join(self._config_dir, agent_ref)
-            agent = FlatAgent(config_file=agent_ref, profiles_file=self._profiles_file)
+            agent = FlatAgent(config_file=agent_ref, profiles_dict=self._profiles_dict)
         # Handle inline config (dict)
         elif isinstance(agent_ref, dict):
-            agent = FlatAgent(config_dict=agent_ref, profiles_file=self._profiles_file)
+            agent = FlatAgent(config_dict=agent_ref, profiles_dict=self._profiles_dict)
         else:
             raise ValueError(f"Invalid agent reference: {agent_ref}")
 
@@ -668,7 +672,7 @@ class FlatMachine:
             _config_dir=peer_config_dir,
             _execution_id=child_id,
             _parent_execution_id=self.execution_id,
-            _profiles_file=self._profiles_file,
+            _profiles_dict=self._profiles_dict,
         )
 
         try:
@@ -1095,6 +1099,10 @@ class FlatMachine:
                 input = input or {}
                 variables = {"input": input}
                 context = self._render_dict(self.initial_context, variables)
+
+                # Inject profiles dict for hooks that create dynamic agents
+                if self._profiles_dict:
+                    context['_profiles'] = self._profiles_dict
 
                 await self._save_checkpoint('machine_start', 'start', step, context)
                 context = await self._run_hook('on_machine_start', context)

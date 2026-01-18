@@ -39,20 +39,23 @@ class ProfileManager:
         {'provider': 'cerebras', 'name': 'zai-glm-4.6', 'temperature': 0.6}
     """
 
-    def __init__(self, profiles_file: Optional[str] = None):
+    def __init__(self, profiles_dict: Optional[Dict[str, Any]] = None):
         """
         Initialize profile manager.
 
         Args:
-            profiles_file: Path to profiles.yml file (optional)
+            profiles_dict: Profiles dict with format:
+                {'profiles': {...}, 'default': 'name', 'override': 'name'}
+                Use load_profiles_from_file() to load from a YAML file.
         """
-        self.profiles_file = profiles_file
         self._profiles: Dict[str, Dict[str, Any]] = {}
         self._default_profile: Optional[str] = None
         self._override_profile: Optional[str] = None
 
-        if profiles_file:
-            self._load_profiles(profiles_file)
+        if profiles_dict:
+            self._profiles = profiles_dict.get('profiles', {})
+            self._default_profile = profiles_dict.get('default')
+            self._override_profile = profiles_dict.get('override')
 
     @classmethod
     def get_instance(cls, config_dir: str) -> "ProfileManager":
@@ -70,7 +73,8 @@ class ProfileManager:
         if config_dir not in _profile_managers:
             profiles_path = os.path.join(config_dir, "profiles.yml")
             if os.path.exists(profiles_path):
-                _profile_managers[config_dir] = cls(profiles_path)
+                profiles_dict = load_profiles_from_file(profiles_path)
+                _profile_managers[config_dir] = cls(profiles_dict)
             else:
                 # No profiles file - return empty manager
                 _profile_managers[config_dir] = cls()
@@ -81,36 +85,13 @@ class ProfileManager:
         """Clear cached ProfileManager instances."""
         _profile_managers.clear()
 
-    def _load_profiles(self, profiles_file: str) -> None:
-        """Load profiles from YAML file."""
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError("pyyaml is required for profiles.yml")
-
-        if not os.path.exists(profiles_file):
-            logger.debug(f"No profiles file at {profiles_file}")
-            return
-
-        with open(profiles_file, 'r') as f:
-            config = yaml.safe_load(f) or {}
-
-        # Validate spec if present
-        spec = config.get('spec')
-        if spec and spec != 'flatprofiles':
-            raise ValueError(f"Invalid profiles spec: expected 'flatprofiles', got '{spec}'")
-
-        # Support both wrapped (spec/data) and unwrapped format
-        data = config.get('data', config)
-
-        self._profiles = data.get('model_profiles', {})
-        self._default_profile = data.get('default')
-        self._override_profile = data.get('override')
-
-        logger.info(
-            f"Loaded {len(self._profiles)} profiles from {profiles_file}"
-            f" (default={self._default_profile}, override={self._override_profile})"
-        )
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize profiles to a dict (for passing to other components)."""
+        return {
+            'profiles': self._profiles,
+            'default': self._default_profile,
+            'override': self._override_profile
+        }
 
     def get_profile(self, name: str) -> Optional[Dict[str, Any]]:
         """
@@ -208,10 +189,63 @@ class ProfileManager:
         return result
 
 
+def load_profiles_from_file(profiles_file: str) -> Dict[str, Any]:
+    """
+    Load profiles from a YAML file.
+
+    Use this to load profiles that can be passed to ProfileManager or
+    injected into context for distributed systems.
+
+    Args:
+        profiles_file: Path to profiles.yml file
+
+    Returns:
+        Profiles dict with format:
+            {'profiles': {...}, 'default': 'name', 'override': 'name'}
+
+    Example:
+        >>> profiles = load_profiles_from_file("config/profiles.yml")
+        >>> manager = ProfileManager(profiles)
+    """
+    try:
+        import yaml
+    except ImportError:
+        raise ImportError("pyyaml is required for profiles.yml")
+
+    if not os.path.exists(profiles_file):
+        logger.debug(f"No profiles file at {profiles_file}")
+        return {'profiles': {}, 'default': None, 'override': None}
+
+    with open(profiles_file, 'r') as f:
+        config = yaml.safe_load(f) or {}
+
+    # Validate spec if present
+    spec = config.get('spec')
+    if spec and spec != 'flatprofiles':
+        raise ValueError(f"Invalid profiles spec: expected 'flatprofiles', got '{spec}'")
+
+    # Support both wrapped (spec/data) and unwrapped format
+    data = config.get('data', config)
+
+    result = {
+        'profiles': data.get('model_profiles', {}),
+        'default': data.get('default'),
+        'override': data.get('override')
+    }
+
+    logger.info(
+        f"Loaded {len(result['profiles'])} profiles from {profiles_file}"
+        f" (default={result['default']}, override={result['override']})"
+    )
+
+    return result
+
+
 def resolve_model_config(
     agent_model_config: Any,
     config_dir: str,
-    profiles_file: Optional[str] = None
+    profiles_file: Optional[str] = None,
+    profiles_dict: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Convenience function to resolve model configuration.
@@ -220,6 +254,7 @@ def resolve_model_config(
         agent_model_config: Agent's model config (string, dict, or None)
         config_dir: Directory containing agent config (for profiles.yml lookup)
         profiles_file: Explicit path to profiles.yml (overrides auto-discovery)
+        profiles_dict: Pre-loaded profiles dict (takes precedence over file)
 
     Returns:
         Fully resolved model configuration dict
@@ -229,8 +264,10 @@ def resolve_model_config(
         >>> print(config)
         {'provider': 'cerebras', 'name': 'zai-glm-4.6', 'temperature': 0.6}
     """
-    if profiles_file:
-        manager = ProfileManager(profiles_file)
+    if profiles_dict:
+        manager = ProfileManager(profiles_dict)
+    elif profiles_file:
+        manager = ProfileManager(load_profiles_from_file(profiles_file))
     else:
         manager = ProfileManager.get_instance(config_dir)
 
@@ -259,6 +296,7 @@ def discover_profiles_file(config_dir: str, explicit_path: Optional[str] = None)
 
 __all__ = [
     "ProfileManager",
+    "load_profiles_from_file",
     "resolve_model_config",
     "discover_profiles_file",
 ]

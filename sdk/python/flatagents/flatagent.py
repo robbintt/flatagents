@@ -124,12 +124,14 @@ class FlatAgent:
         tool_provider: Optional["MCPToolProvider"] = None,
         backend: Optional[str] = None,
         profiles_file: Optional[str] = None,
+        profiles_dict: Optional[Dict] = None,
         **kwargs
     ):
         if jinja2 is None:
             raise ImportError("jinja2 is required for FlatAgent. Install with: pip install jinja2")
 
         self._profiles_file = profiles_file
+        self._profiles_dict = profiles_dict
         self._load_config(config_file, config_dict, **kwargs)
         self._validate_spec()
         self._parse_agent_config()
@@ -286,8 +288,10 @@ class FlatAgent:
         self._config_dir = config_dir
 
         # Auto-discover profiles.yml in config_dir if not explicitly provided
-        from .profiles import discover_profiles_file
-        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+        # (skip if profiles_dict was passed directly)
+        if not self._profiles_dict:
+            from .profiles import discover_profiles_file
+            self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
 
         # Extract model config from data section
         data = config.get('data', {})
@@ -298,7 +302,8 @@ class FlatAgent:
         model_config = resolve_model_config(
             raw_model_config,
             config_dir,
-            profiles_file=self._profiles_file
+            profiles_file=self._profiles_file,
+            profiles_dict=self._profiles_dict
         )
 
         # Build model name from provider/name
