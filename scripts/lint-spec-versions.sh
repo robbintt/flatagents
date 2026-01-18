@@ -138,12 +138,94 @@ if [[ $TOTAL_MISMATCHES -gt 0 ]]; then
         echo ""
     fi
 
-    exit 1
+    SPEC_VERSION_FAILED=true
 else
     echo "✓ All spec_version references match:"
     echo "  - flatagent configs use v$FLATAGENT_VERSION"
     echo "  - flatmachine configs use v$FLATMACHINE_VERSION"
     echo "  - profiles configs use v$PROFILES_VERSION"
     echo "  - README.md/MACHINES.md inline examples match"
+    SPEC_VERSION_FAILED=false
+fi
+
+# =============================================================================
+# BROAD SEMVER SCAN - Find any semver that doesn't match lockstep version
+# =============================================================================
+echo ""
+echo "Running broad semver scan for non-lockstep versions..."
+
+LOCKSTEP_VERSION="$FLATAGENT_VERSION"
+STRAY_VERSIONS=()
+
+# Use rg with negative lookahead workaround:
+# Find semver NOT matching lockstep, excluding known noise patterns
+#
+# Exclusions built into the search:
+# - node_modules, .git, __pycache__, .venv, local/, assets/
+# - lock files
+# - Historical version refs (vX.X.X)
+# - npm dep versions (^X.X.X, ~X.X.X, >=X.X.X)
+# - package.json "version" fields
+# - pyproject.toml version fields in examples
+
+# First find all semver matches, then filter
+while IFS=: read -r file lineno content; do
+    [[ -z "$file" ]] && continue
+
+    # Extract semver from content
+    VERSION=$(echo "$content" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    [[ -z "$VERSION" ]] && continue
+
+    # Skip if matches lockstep
+    [[ "$VERSION" == "$LOCKSTEP_VERSION" ]] && continue
+
+    # Skip vX.X.X historical references (features added in vX.X.X)
+    echo "$content" | grep -qE "v$VERSION" && continue
+
+    # Skip npm/pip dependency patterns: ^X.X.X, ~X.X.X, >=X.X.X, etc
+    echo "$content" | grep -qE '[\"\'"'"'][\^~><!=]+[0-9]+\.[0-9]+\.[0-9]+' && continue
+
+    # Skip package.json "version" field
+    [[ "$file" == *"package.json" ]] && echo "$content" | grep -qE '"version"' && continue
+
+    # Skip pyproject.toml version in examples
+    [[ "$file" == *"examples"*"pyproject.toml" ]] && echo "$content" | grep -qE '^version' && continue
+
+    # Skip runtime spec (separate versioning)
+    [[ "$file" == *"runtime"* ]] && echo "$content" | grep -qE 'VERSION' && continue
+
+    # Skip sdk/examples README version examples
+    [[ "$file" == *"sdk/examples/README.md" ]] && continue
+
+    STRAY_VERSIONS+=("$file:$lineno: $VERSION (lockstep is $LOCKSTEP_VERSION)")
+done < <(rg -n '[0-9]+\.[0-9]+\.[0-9]+' \
+    --glob '*.yml' --glob '*.yaml' --glob '*.md' --glob '*.ts' --glob '*.py' --glob '*.toml' \
+    --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/__pycache__/**' --glob '!**/.venv/**' \
+    --glob '!*-lock.json' --glob '!*.lock' --glob '!local/**' --glob '!assets/**' \
+    2>/dev/null || true)
+
+if [[ ${#STRAY_VERSIONS[@]} -gt 0 ]]; then
+    echo ""
+    echo "⚠️  Found ${#STRAY_VERSIONS[@]} stray semver(s) not matching lockstep version ($LOCKSTEP_VERSION):"
+    for stray in "${STRAY_VERSIONS[@]}"; do
+        echo "  - $stray"
+    done
+    echo ""
+    echo "Review these - they may be:"
+    echo "  - Old versions that need updating"
+    echo "  - Legitimate (historical docs, test fixtures, etc.)"
+else
+    echo "✓ No stray semver versions found"
+fi
+
+# =============================================================================
+# FINAL EXIT
+# =============================================================================
+if [[ "$SPEC_VERSION_FAILED" == true ]]; then
+    echo ""
+    exit 1
+else
+    echo ""
+    echo "All checks passed!"
     exit 0
 fi
