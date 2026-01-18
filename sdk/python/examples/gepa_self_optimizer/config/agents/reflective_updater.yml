@@ -1,5 +1,5 @@
 spec: flatagent
-spec_version: "0.7.2"
+spec_version: "0.7.3"
 
 data:
   name: reflective-updater
