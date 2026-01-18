@@ -1,15 +1,12 @@
 # Abstract Analyzer Agent
 # Extracts key findings from title, authors, and abstract
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: abstract-analyzer
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.3
+  model: default
   
   system: |
     You are a research paper analyst. Your task is to extract structured insights 

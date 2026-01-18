@@ -3,15 +3,12 @@
 # System prompt follows SillyTavern chat completion format
 
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: character-responder
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+  model: default
   
   # SillyTavern-compatible system prompt format
   system: |

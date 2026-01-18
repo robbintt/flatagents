@@ -1,14 +1,10 @@
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: response-generator
 
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
-    max_tokens: 4096
+  model: default
 
   system: |
     You generate responses to tasks, sometimes introducing specific errors to test

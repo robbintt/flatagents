@@ -1,15 +1,12 @@
 # Section Analyzer Agent
 # Analyzes paper sections for technical details and results
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: section-analyzer
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.3
+  model: default
   
   system: |
     You are a technical research analyst. Analyze paper sections to extract 

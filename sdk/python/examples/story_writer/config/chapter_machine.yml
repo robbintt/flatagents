@@ -2,10 +2,11 @@
 # Draft → Critique → Revise loop for a single chapter
 
 spec: flatmachine
-spec_version: "0.3.0"
+spec_version: "0.7.0"
 
 data:
   name: chapter-writer
+  profiles: ./profiles.yml
   
   context:
     genre: "{{ input.genre }}"

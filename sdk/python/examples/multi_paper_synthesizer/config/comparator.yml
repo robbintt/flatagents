@@ -1,15 +1,12 @@
 # Comparator Agent
 # Compares findings across multiple paper analyses
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: comparator
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.3
+  model: default
   
   system: |
     You are an expert research analyst specializing in comparative literature review.

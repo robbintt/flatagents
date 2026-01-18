@@ -1,15 +1,12 @@
 # Formatter Agent
 # Creates beautifully formatted markdown synthesis report
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: formatter
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.2
+  model: default
   
   system: |
     You are a technical document formatter. Create beautifully formatted 

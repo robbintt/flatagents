@@ -1,12 +1,9 @@
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: writer
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+  model: default
   system: You write short, punchy marketing copy. Be creative and memorable.
   user: |
     Product: {{ input.product }}

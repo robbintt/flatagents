@@ -1,14 +1,10 @@
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: gepa-judge
 
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
-    max_tokens: 2048
+  model: default
 
   system: |
     You are a rigorous evaluator of AI agent outputs. Your role is to assess whether

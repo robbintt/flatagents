@@ -2,10 +2,11 @@
 # Demonstrates machine peering: outlines story, then launches chapter_writer peer for each chapter
 
 spec: flatmachine
-spec_version: "0.3.0"
+spec_version: "0.7.0"
 
 data:
   name: story-orchestrator
+  profiles: ./profiles.yml
   
   # Enable checkpoint persistence to disk
   persistence:

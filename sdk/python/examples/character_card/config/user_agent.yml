@@ -2,15 +2,12 @@
 # LLM-driven user that generates responses in character chats
 
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: user-agent
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+  model: default
   
   system: |
     You are roleplaying as {{ input.user_name }} in a conversation with {{ input.card_name }}.

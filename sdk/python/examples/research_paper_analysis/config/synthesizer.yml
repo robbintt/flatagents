@@ -1,15 +1,12 @@
 # Synthesizer Agent
 # Creates or improves executive summary based on analysis and critique
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.0"
 
 data:
   name: synthesizer
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.5
+  model: default
   
   system: |
     You are an expert at synthesizing research findings into clear, 
