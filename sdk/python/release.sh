@@ -7,24 +7,31 @@ REPO_ROOT="$SDK_DIR/../.."
 ASSETS_DIR="$SDK_DIR/flatagents/assets"
 
 # Parse arguments
-DRY_RUN=false
+DRY_RUN=true  # Safe by default, note that dry run DOES change local assets.
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --dry-run|-n)
-            DRY_RUN=true
+        --apply)
+            DRY_RUN=false
             shift
             ;;
         *)
             echo "Unknown flag: $1"
-            echo "Usage: $0 [--dry-run|-n]"
+            echo "Usage: $0 [--apply]"
+            echo ""
+            echo "Options:"
+            echo "  --apply    Actually upload to PyPI (default is dry-run)"
             exit 1
             ;;
     esac
 done
 
-echo "=== Python SDK Release Validation ==="
+echo "=== Python SDK Release ==="
 if [ "$DRY_RUN" = true ]; then
-    echo "(DRY RUN - will not upload to PyPI)"
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo "  DRY RUN MODE (will not upload to PyPI)"
+    echo "  Run with --apply to actually release"
+    echo "════════════════════════════════════════════════════════════"
 fi
 echo ""
 
