@@ -73,7 +73,7 @@
  * EXAMPLE CONFIGURATION:
  * ----------------------
  *
- *   spec: flatagents 
+ *   spec: flatagents
  *   spec_version: "0.0.0"
  *
  *   data:
@@ -134,6 +134,19 @@
  * Supports wildcards: "server:*" matches all tools from a server.
  *   allow - Tools to allow (if specified, only these are included)
  *   deny  - Tools to deny (takes precedence over allow)
+ *
+ * AGENTDATA MODEL FIELD:
+ * ----------------------
+ * Model configuration accepts three forms:
+ *   - String: Profile name lookup (e.g., "fast-cheap")
+ *   - ModelConfig: Inline config with name, provider, etc.
+ *   - ProfiledModelConfig: Profile reference with optional overrides
+ *
+ * PROFILEDMODELCONFIG:
+ * --------------------
+ * Model config that references a profile with optional overrides.
+ * Example: { profile: "fast-cheap", temperature: 0.8 }
+ * The profile field specifies which profile name to use as base.
  */
 
 export const SPEC_VERSION = "0.7.0";
@@ -147,12 +160,6 @@ export interface AgentWrapper {
 
 export interface AgentData {
   name?: string;
-  /**
-   * Model configuration.
-   * - String: Profile name lookup (e.g., "fast-cheap")
-   * - ModelConfig: Inline config with name, provider, etc.
-   * - ProfiledModelConfig: Profile reference with optional overrides
-   */
   model: string | ModelConfig | ProfiledModelConfig;
   system: string;
   user: string;
@@ -194,12 +201,7 @@ export interface ModelConfig {
   base_url?: string;
 }
 
-/**
- * Model config that references a profile with optional overrides.
- * Example: { profile: "fast-cheap", temperature: 0.8 }
- */
 export interface ProfiledModelConfig extends Partial<ModelConfig> {
-  /** Profile name to use as base */
   profile: string;
 }
 

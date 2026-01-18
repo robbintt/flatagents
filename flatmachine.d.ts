@@ -213,13 +213,9 @@
  * ------------------
  * States can launch peer machines via `machine:` field
  * MachineReference   - {path: "./peer.yml"} or {inline: {...}}
- */
-
-export const SPEC_VERSION = "0.4.0";
-
-/**
- * URI Scheme for FlatAgents
  *
+ * URI SCHEME:
+ * -----------
  * Format: flatagents://{execution_id}[/{path}]
  *
  * Paths:
@@ -233,7 +229,34 @@ export const SPEC_VERSION = "0.4.0";
  * Each machine execution has a unique_id. Parent generates child's ID
  * before launching, enabling parent to know where to read results without
  * any child-to-parent messaging.
+ *
+ * EXECUTION CONFIG:
+ * -----------------
+ * type           - "default" | "retry" | "parallel" | "mdap_voting"
+ * backoffs       - Retry: seconds between retries
+ * jitter         - Retry: random factor (0-1)
+ * n_samples      - Parallel: number of samples
+ * k_margin       - MDAP voting: consensus threshold
+ * max_candidates - MDAP voting: max candidates
+ *
+ * MACHINE INPUT:
+ * --------------
+ * Per-machine input configuration for parallel execution.
+ * Use when different machines need different inputs.
+ *
+ * LAUNCH INTENT:
+ * --------------
+ * Launch intent for outbox pattern.
+ * Recorded in checkpoint before launching to ensure exactly-once semantics.
+ *
+ * MACHINE SNAPSHOT:
+ * -----------------
+ * Wire format for checkpoints.
+ * parent_execution_id - Lineage tracking (v0.4.0)
+ * pending_launches    - Outbox pattern (v0.4.0)
  */
+
+export const SPEC_VERSION = "0.4.0";
 
 export interface MachineWrapper {
   spec: "flatmachine";
@@ -273,25 +296,15 @@ export interface StateDefinition {
   transitions?: Transition[];
   tool_loop?: boolean;
   sampling?: "single" | "multi";
-
-  // Dynamic parallelism (v0.4.0)
   foreach?: string;
   as?: string;
   key?: string;
-
-  // Parallel options (v0.4.0)
   mode?: "settled" | "any";
   timeout?: number;
-
-  // Fire-and-forget (v0.4.0)
   launch?: string | string[];
   launch_input?: Record<string, any>;
 }
 
-/**
- * Per-machine input configuration for parallel execution.
- * Use when different machines need different inputs.
- */
 export interface MachineInput {
   name: string;
   input?: Record<string, any>;
@@ -299,12 +312,9 @@ export interface MachineInput {
 
 export interface ExecutionConfig {
   type: "default" | "retry" | "parallel" | "mdap_voting";
-  // Retry config
   backoffs?: number[];
   jitter?: number;
-  // Parallel config
   n_samples?: number;
-  // MDAP voting config
   k_margin?: number;
   max_candidates?: number;
 }
@@ -319,10 +329,6 @@ export { AgentWrapper, OutputSchema };
 
 export type FlatmachineConfig = MachineWrapper;
 
-/**
- * Launch intent for outbox pattern.
- * Recorded in checkpoint before launching to ensure exactly-once semantics.
- */
 export interface LaunchIntent {
   execution_id: string;
   machine: string;
@@ -342,11 +348,7 @@ export interface MachineSnapshot {
   output?: Record<string, any>;
   total_api_calls?: number;
   total_cost?: number;
-
-  // Lineage (v0.4.0)
   parent_execution_id?: string;
-
-  // Outbox pattern (v0.4.0)
   pending_launches?: LaunchIntent[];
 }
 

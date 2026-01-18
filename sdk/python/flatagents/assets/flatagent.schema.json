@@ -43,8 +43,7 @@
             {
               "$ref": "#/definitions/ProfiledModelConfig"
             }
-          ],
-          "description": "Model configuration.\n- String: Profile name lookup (e.g., \"fast-cheap\")\n- ModelConfig: Inline config with name, provider, etc.\n- ProfiledModelConfig: Profile reference with optional overrides"
+          ]
         },
         "system": {
           "type": "string"
@@ -142,15 +141,13 @@
           "type": "string"
         },
         "profile": {
-          "type": "string",
-          "description": "Profile name to use as base"
+          "type": "string"
         }
       },
       "required": [
         "profile"
       ],
-      "additionalProperties": false,
-      "description": "Model config that references a profile with optional overrides. Example: { profile: \"fast-cheap\", temperature: 0.8 }"
+      "additionalProperties": false
     },
     "OutputSchema": {
       "type": "object",

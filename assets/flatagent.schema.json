@@ -33,7 +33,17 @@
           "type": "string"
         },
         "model": {
-          "$ref": "#/definitions/ModelConfig"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelConfig"
+            },
+            {
+              "$ref": "#/definitions/ProfiledModelConfig"
+            }
+          ]
         },
         "system": {
           "type": "string"
@@ -76,15 +86,66 @@
         "top_p": {
           "type": "number"
         },
+        "top_k": {
+          "type": "number"
+        },
         "frequency_penalty": {
           "type": "number"
         },
         "presence_penalty": {
           "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
         }
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProfiledModelConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "type": "number"
+        },
+        "presence_penalty": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile"
       ],
       "additionalProperties": false
     },

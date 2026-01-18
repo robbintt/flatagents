@@ -85,6 +85,26 @@
  *
  *   metadata:
  *     description: "Model profiles for the project"
+ *
+ * PROFILESDATA FIELDS:
+ * --------------------
+ * model_profiles - Named model profiles, keyed by profile name
+ * default        - Default profile name, used when agent has no model config
+ * override       - Override profile name, trumps all agent model configs
+ *
+ * MODELPROFILECONFIG FIELDS:
+ * --------------------------
+ * Defines all parameters for an LLM model.
+ * name              - Model name (e.g., "gpt-4", "zai-glm-4.6", "claude-3-opus-20240229")
+ * provider          - Provider name (e.g., "openai", "anthropic", "cerebras", "ollama")
+ * temperature       - Sampling temperature (0.0 to 2.0)
+ * max_tokens        - Maximum tokens to generate
+ * top_p             - Nucleus sampling parameter (0.0 to 1.0)
+ * top_k             - Top-k sampling parameter
+ * frequency_penalty - Frequency penalty (-2.0 to 2.0)
+ * presence_penalty  - Presence penalty (-2.0 to 2.0)
+ * seed              - Random seed for reproducibility
+ * base_url          - Custom base URL for the API (e.g., for local models or proxies)
  */
 
 export const SPEC_VERSION = "0.1.0";
@@ -97,49 +117,21 @@ export interface ProfilesWrapper {
 }
 
 export interface ProfilesData {
-  /** Named model profiles, keyed by profile name */
   model_profiles: Record<string, ModelProfileConfig>;
-
-  /** Default profile name - used when agent has no model config */
   default?: string;
-
-  /** Override profile name - trumps all agent model configs */
   override?: string;
 }
 
-/**
- * Model profile configuration.
- * Defines all parameters for an LLM model.
- */
 export interface ModelProfileConfig {
-  /** Model name (e.g., "gpt-4", "zai-glm-4.6", "claude-3-opus-20240229") */
   name: string;
-
-  /** Provider name (e.g., "openai", "anthropic", "cerebras", "ollama") */
   provider?: string;
-
-  /** Sampling temperature (0.0 to 2.0) */
   temperature?: number;
-
-  /** Maximum tokens to generate */
   max_tokens?: number;
-
-  /** Nucleus sampling parameter (0.0 to 1.0) */
   top_p?: number;
-
-  /** Top-k sampling parameter */
   top_k?: number;
-
-  /** Frequency penalty (-2.0 to 2.0) */
   frequency_penalty?: number;
-
-  /** Presence penalty (-2.0 to 2.0) */
   presence_penalty?: number;
-
-  /** Random seed for reproducibility */
   seed?: number;
-
-  /** Custom base URL for the API (e.g., for local models or proxies) */
   base_url?: string;
 }
 

@@ -24,8 +24,7 @@
         "spec_version",
         "data"
       ],
-      "additionalProperties": false,
-      "description": "URI Scheme for FlatAgents\n\nFormat: flatagents://{execution_id}[/{path}]\n\nPaths:   /checkpoint     - Machine state for resume   /result         - Final output after completion\n\nExamples:   flatagents://550e8400-e29b-41d4-a716-446655440000/checkpoint   flatagents://550e8400-e29b-41d4-a716-446655440000/result\n\nEach machine execution has a unique_id. Parent generates child's ID before launching, enabling parent to know where to read results without any child-to-parent messaging."
+      "additionalProperties": false
     },
     "MachineData": {
       "type": "object",
@@ -128,8 +127,7 @@
             {
               "$ref": "#/definitions/ProfiledModelConfig"
             }
-          ],
-          "description": "Model configuration.\n- String: Profile name lookup (e.g., \"fast-cheap\")\n- ModelConfig: Inline config with name, provider, etc.\n- ProfiledModelConfig: Profile reference with optional overrides"
+          ]
         },
         "system": {
           "type": "string"
@@ -227,15 +225,13 @@
           "type": "string"
         },
         "profile": {
-          "type": "string",
-          "description": "Profile name to use as base"
+          "type": "string"
         }
       },
       "required": [
         "profile"
       ],
-      "additionalProperties": false,
-      "description": "Model config that references a profile with optional overrides. Example: { profile: \"fast-cheap\", temperature: 0.8 }"
+      "additionalProperties": false
     },
     "OutputSchema": {
       "type": "object",
@@ -482,8 +478,7 @@
       "required": [
         "name"
       ],
-      "additionalProperties": false,
-      "description": "Per-machine input configuration for parallel execution. Use when different machines need different inputs."
+      "additionalProperties": false
     },
     "ExecutionConfig": {
       "type": "object",

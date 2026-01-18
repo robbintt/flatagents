@@ -24,8 +24,7 @@
         "spec_version",
         "data"
       ],
-      "additionalProperties": false,
-      "description": "URI Scheme for FlatAgents\n\nFormat: flatagents://{execution_id}[/{path}]\n\nPaths:   /checkpoint     - Machine state for resume   /result         - Final output after completion\n\nExamples:   flatagents://550e8400-e29b-41d4-a716-446655440000/checkpoint   flatagents://550e8400-e29b-41d4-a716-446655440000/result\n\nEach machine execution has a unique_id. Parent generates child's ID before launching, enabling parent to know where to read results without any child-to-parent messaging."
+      "additionalProperties": false
     },
     "MachineData": {
       "type": "object",
@@ -118,7 +117,17 @@
           "type": "string"
         },
         "model": {
-          "$ref": "#/definitions/ModelConfig"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelConfig"
+            },
+            {
+              "$ref": "#/definitions/ProfiledModelConfig"
+            }
+          ]
         },
         "system": {
           "type": "string"
@@ -161,15 +170,66 @@
         "top_p": {
           "type": "number"
         },
+        "top_k": {
+          "type": "number"
+        },
         "frequency_penalty": {
           "type": "number"
         },
         "presence_penalty": {
           "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
         }
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProfiledModelConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "type": "number"
+        },
+        "presence_penalty": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile"
       ],
       "additionalProperties": false
     },
@@ -418,8 +478,7 @@
       "required": [
         "name"
       ],
-      "additionalProperties": false,
-      "description": "Per-machine input configuration for parallel execution. Use when different machines need different inputs."
+      "additionalProperties": false
     },
     "ExecutionConfig": {
       "type": "object",
