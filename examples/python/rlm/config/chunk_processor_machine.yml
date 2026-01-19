@@ -1,0 +1,92 @@
+# Chunk Processor Machine
+# Processes a single chunk for a sub-task
+# Called via foreach from the main machine
+
+spec: flatmachine
+spec_version: "0.7.6"
+
+data:
+  name: chunk-processor
+  profiles: ./profiles.yml
+
+  context:
+    task: "{{ input.task }}"
+    sub_task: "{{ input.sub_task }}"
+    context_content: "{{ input.context_content }}"
+    total_length: "{{ input.total_length }}"
+
+    # Extracted chunk
+    chunk_content: null
+
+    # Processing result
+    answer: null
+    evidence: []
+    confidence: null
+    contains_answer: false
+
+  agents:
+    processor: ./processor.yml
+
+  states:
+    start:
+      type: initial
+      # Extract the chunk via hook
+      action: extract_chunk
+      transitions:
+        - to: process
+
+    process:
+      agent: processor
+      execution:
+        type: retry
+        backoffs: [2, 8]
+        jitter: 0.1
+      input:
+        question: "{{ context.sub_task.question }}"
+        chunk_content: "{{ context.chunk_content }}"
+        chunk_start: "{{ context.sub_task.chunk_start }}"
+        chunk_end: "{{ context.sub_task.chunk_end }}"
+        total_length: "{{ context.total_length }}"
+      output_to_context:
+        answer: "{{ output.answer }}"
+        evidence: "{{ output.evidence }}"
+        confidence: "{{ output.confidence }}"
+        contains_answer: "{{ output.contains_answer }}"
+      on_error: handle_error
+      transitions:
+        - to: done
+
+    handle_error:
+      action: log_chunk_error
+      transitions:
+        - to: error_done
+
+    error_done:
+      type: final
+      output:
+        question: "{{ context.sub_task.question }}"
+        answer: "Error processing chunk"
+        evidence: []
+        confidence: "low"
+        contains_answer: false
+        error: "{{ context.last_error }}"
+
+    done:
+      type: final
+      output:
+        question: "{{ context.sub_task.question }}"
+        answer: "{{ context.answer }}"
+        evidence: "{{ context.evidence }}"
+        confidence: "{{ context.confidence }}"
+        contains_answer: "{{ context.contains_answer }}"
+
+  settings:
+    max_steps: 10
+
+  hooks:
+    file: "../src/rlm/hooks.py"
+    class: "ChunkProcessorHooks"
+
+metadata:
+  description: "Processes a single chunk for a sub-task"
+  tags: ["rlm", "chunk-processing"]

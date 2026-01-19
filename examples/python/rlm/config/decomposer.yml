@@ -1,0 +1,90 @@
+# Decomposer Agent - Breaks down complex tasks into sub-queries
+# Determines how to partition work for recursive calls
+
+spec: flatagent
+spec_version: "0.7.6"
+
+data:
+  name: rlm-decomposer
+
+  model:
+    profile: "smart"
+    temperature: 0.0
+
+  system: |
+    You are an RLM (Recursive Language Model) decomposer agent. Your job is to break down a complex task over a long context into smaller, independent sub-tasks.
+
+    ## Context Information:
+    - Total length: {{ input.context_length }} characters (~{{ input.estimated_tokens }} tokens)
+    - Content type: {{ input.content_type | default('unknown') }}
+    - Structure: {{ input.structure_summary | default('unknown') }}
+
+    ## Exploration Findings:
+    {{ input.exploration_findings }}
+
+    ## Suggested Chunks for Analysis:
+    {% if input.suggested_chunks %}
+    {% for chunk in input.suggested_chunks %}
+    - [{{ chunk.start }}:{{ chunk.end }}] - {{ chunk.reason }}
+    {% endfor %}
+    {% else %}
+    (No specific chunks suggested)
+    {% endif %}
+
+    ## Main Task:
+    {{ input.task }}
+
+    ## Decomposition Strategy:
+    1. If the task requires aggregation (counting, summing, comparing), split by logical units
+    2. If the task requires finding specific information, target likely locations
+    3. If the task requires understanding relationships, process related sections together
+    4. Each sub-task should be answerable from a manageable chunk (< {{ input.max_chunk_size | default(16000) }} chars)
+
+  user: |
+    Decompose the main task into sub-tasks that can be answered by processing specific chunks of the input.
+
+    For each sub-task:
+    - Define a clear, self-contained question
+    - Specify the chunk(s) of input needed (as start:end indices)
+    - Explain how this contributes to the final answer
+
+    If the task is simple enough to answer directly without decomposition, set `needs_decomposition` to false.
+
+  output:
+    needs_decomposition:
+      type: bool
+      description: "Whether the task needs to be decomposed into sub-tasks"
+    sub_tasks:
+      type: list
+      description: "List of sub-tasks to process recursively"
+      items:
+        type: object
+        properties:
+          id:
+            type: str
+            description: "Unique identifier for this sub-task"
+          question:
+            type: str
+            description: "The specific question to answer"
+          chunk_start:
+            type: int
+            description: "Start index of the relevant chunk"
+          chunk_end:
+            type: int
+            description: "End index of the relevant chunk"
+          contribution:
+            type: str
+            description: "How this sub-task contributes to the final answer"
+          priority:
+            type: int
+            description: "Priority (1=highest) for ordering"
+    aggregation_strategy:
+      type: str
+      description: "How to combine sub-task results (concat, sum, vote, synthesize)"
+    direct_answer:
+      type: str
+      description: "Direct answer if no decomposition needed"
+
+metadata:
+  description: "Decomposes complex tasks into sub-tasks for recursive processing"
+  tags: ["rlm", "decomposition", "planning"]

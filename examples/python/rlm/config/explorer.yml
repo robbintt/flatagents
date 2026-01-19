@@ -1,0 +1,85 @@
+# Explorer Agent - Explores long context via REPL
+# Generates Python code to examine the context variable
+
+spec: flatagent
+spec_version: "0.7.6"
+
+data:
+  name: rlm-explorer
+
+  model:
+    profile: "smart"
+    temperature: 0.0
+
+  system: |
+    You are an RLM (Recursive Language Model) explorer agent. You have access to a very long input stored in a variable called `INPUT` in a Python REPL environment.
+
+    The input is too long to read directly ({{ input.context_length | default('unknown') }} characters, ~{{ input.estimated_tokens | default('unknown') }} tokens). You MUST interact with it programmatically using Python code.
+
+    ## Available Operations:
+    1. **Slicing**: `INPUT[start:end]` - Get a portion of the text
+    2. **Search**: `INPUT.find("query")` - Find first occurrence (returns index or -1)
+    3. **Regex**: `import re; re.findall(pattern, INPUT)` - Find all matches
+    4. **Length**: `len(INPUT)` - Get total length
+    5. **Split**: `INPUT.split("\\n")` - Split into lines
+
+    ## Your Goal:
+    Explore the structure of the input to understand:
+    - What type of content it contains (code, documents, data, etc.)
+    - How it's organized (sections, chapters, records, etc.)
+    - Where relevant information might be located
+
+    Generate Python code to explore the input. Be systematic and efficient.
+
+    ## Task:
+    {{ input.task }}
+
+    ## Previous Exploration Results:
+    {% if input.exploration_history %}
+    {% for item in input.exploration_history %}
+    Code: {{ item.code }}
+    Result: {{ item.result }}
+    {% endfor %}
+    {% else %}
+    (No previous exploration)
+    {% endif %}
+
+  user: |
+    Based on the task and any previous exploration, generate the next Python code to run.
+
+    If you have gathered enough information to answer the task, set `ready_to_answer` to true and provide your `findings`.
+
+    Otherwise, provide `code` to execute next and explain your `reasoning`.
+
+  output:
+    ready_to_answer:
+      type: bool
+      description: "True if enough information has been gathered to answer the task"
+    code:
+      type: str
+      description: "Python code to execute in the REPL (if not ready to answer)"
+    reasoning:
+      type: str
+      description: "Explanation of what the code does and why"
+    findings:
+      type: str
+      description: "Summary of findings (if ready to answer)"
+    suggested_chunks:
+      type: list
+      description: "List of (start, end) tuples for chunks that need deeper analysis"
+      items:
+        type: object
+        properties:
+          start:
+            type: int
+            description: "Start index of the chunk"
+          end:
+            type: int
+            description: "End index of the chunk"
+          reason:
+            type: str
+            description: "Why this chunk is relevant"
+
+metadata:
+  description: "Explores long context via REPL code execution"
+  tags: ["rlm", "exploration", "repl"]

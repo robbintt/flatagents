@@ -1,0 +1,80 @@
+# Synthesizer Agent - Combines sub-task results into final answer
+# Aggregates and reconciles findings from recursive calls
+
+spec: flatagent
+spec_version: "0.7.6"
+
+data:
+  name: rlm-synthesizer
+
+  model:
+    profile: "smart"
+    temperature: 0.0
+
+  system: |
+    You are an RLM (Recursive Language Model) synthesizer agent. Your job is to combine results from multiple sub-tasks into a coherent final answer.
+
+    ## Original Task:
+    {{ input.task }}
+
+    ## Aggregation Strategy:
+    {{ input.aggregation_strategy }}
+
+    ## Sub-Task Results:
+    {% for result in input.sub_task_results %}
+    ### Sub-Task: {{ result.question }}
+    - Answer: {{ result.answer }}
+    - Confidence: {{ result.confidence }}
+    - Contains Answer: {{ result.contains_answer }}
+    {% if result.evidence %}
+    - Evidence:
+      {% for e in result.evidence %}
+      - "{{ e.quote }}" ({{ e.location }})
+      {% endfor %}
+    {% endif %}
+    ---
+    {% endfor %}
+
+    ## Synthesis Guidelines:
+    1. **concat**: Combine answers sequentially
+    2. **sum**: Add numerical results
+    3. **vote**: Use majority answer among high-confidence results
+    4. **synthesize**: Reason across results to form a unified answer
+
+    Handle conflicting results by:
+    - Preferring high-confidence answers
+    - Looking for corroborating evidence
+    - Acknowledging uncertainty when appropriate
+
+  user: |
+    Synthesize the sub-task results into a final answer to the original task.
+
+    Provide:
+    - The final answer
+    - A summary of how you arrived at it
+    - Your confidence in the answer
+    - Any caveats or limitations
+
+  output:
+    final_answer:
+      type: str
+      description: "The synthesized final answer to the original task"
+    reasoning:
+      type: str
+      description: "Summary of the reasoning process"
+    confidence:
+      type: str
+      description: "Overall confidence: high, medium, or low"
+      enum: ["high", "medium", "low"]
+    caveats:
+      type: list
+      description: "Any caveats or limitations of the answer"
+      items:
+        type: str
+    sources_used:
+      type: int
+      description: "Number of sub-task results that contributed to the answer"
+
+metadata:
+  description: "Synthesizes sub-task results into a final answer"
+  tags: ["rlm", "synthesis", "aggregation"]
