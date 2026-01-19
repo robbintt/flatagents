@@ -274,6 +274,25 @@ def resolve_model_config(
     return manager.resolve_model_config(agent_model_config)
 
 
+def resolve_profiles_with_fallback(
+    own_profiles: Optional[Dict[str, Any]],
+    parent_profiles: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve profiles: own wins entirely, parent is fallback only when own is None.
+
+    No merging. Nearest profiles.yml wins completely.
+
+    Args:
+        own_profiles: Child's own profiles (from its profiles.yml)
+        parent_profiles: Parent's profiles (fallback for dynamic agents/machines)
+
+    Returns:
+        own_profiles if exists, else parent_profiles, else None
+    """
+    return own_profiles if own_profiles else parent_profiles
+
+
 def discover_profiles_file(config_dir: str, explicit_path: Optional[str] = None) -> Optional[str]:
     """
     Discover profiles.yml in config_dir if not explicitly provided.
@@ -298,5 +317,6 @@ __all__ = [
     "ProfileManager",
     "load_profiles_from_file",
     "resolve_model_config",
+    "resolve_profiles_with_fallback",
     "discover_profiles_file",
 ]

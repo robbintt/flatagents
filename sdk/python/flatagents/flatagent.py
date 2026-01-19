@@ -287,11 +287,12 @@ class FlatAgent:
         self.config = config
         self._config_dir = config_dir
 
-        # Auto-discover profiles.yml in config_dir if not explicitly provided
-        # (skip if profiles_dict was passed directly)
-        if not self._profiles_dict:
-            from .profiles import discover_profiles_file
-            self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+        # Always discover own profiles first; own wins, parent is fallback only
+        from .profiles import discover_profiles_file, load_profiles_from_file, resolve_profiles_with_fallback
+        parent_profiles_dict = self._profiles_dict
+        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+        own_profiles_dict = load_profiles_from_file(self._profiles_file) if self._profiles_file else None
+        self._profiles_dict = resolve_profiles_with_fallback(own_profiles_dict, parent_profiles_dict)
 
         # Extract model config from data section
         data = config.get('data', {})
@@ -302,7 +303,6 @@ class FlatAgent:
         model_config = resolve_model_config(
             raw_model_config,
             config_dir,
-            profiles_file=self._profiles_file,
             profiles_dict=self._profiles_dict
         )
 

@@ -108,8 +108,8 @@ class FlatMachine:
         # Extract _config_dir override (used for launched machines)
         config_dir_override = kwargs.pop('_config_dir', None)
 
-        # Store profiles for agent instantiation (dict takes precedence over file)
-        self._profiles_dict = kwargs.pop('_profiles_dict', None)
+        # Store parent profiles (fallback for dynamic machines with no profiles.yml)
+        parent_profiles_dict = kwargs.pop('_profiles_dict', None)
         self._profiles_file = profiles_file or kwargs.pop('_profiles_file', None)
 
         self._load_config(config_file, config_dict)
@@ -118,12 +118,11 @@ class FlatMachine:
         if config_dir_override:
             self._config_dir = config_dir_override
 
-        # Load profiles: use dict if provided, otherwise discover and load from file
-        if not self._profiles_dict:
-            from .profiles import discover_profiles_file, load_profiles_from_file
-            self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
-            if self._profiles_file:
-                self._profiles_dict = load_profiles_from_file(self._profiles_file)
+        # Always discover own profiles first; own wins, parent is fallback only
+        from .profiles import discover_profiles_file, load_profiles_from_file, resolve_profiles_with_fallback
+        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
+        own_profiles_dict = load_profiles_from_file(self._profiles_file) if self._profiles_file else None
+        self._profiles_dict = resolve_profiles_with_fallback(own_profiles_dict, parent_profiles_dict)
 
         # Merge kwargs into config data (shallow merge)
         if kwargs and 'data' in self.config:
