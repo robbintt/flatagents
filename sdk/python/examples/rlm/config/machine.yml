@@ -7,7 +7,6 @@ spec_version: "0.7.6"
 
 data:
   name: rlm-main
-  profiles: ./profiles.yml
 
   context:
     # Input parameters
@@ -71,6 +70,10 @@ data:
         exploration_history: "{{ context.exploration_history }}"
       output_to_context:
         exploration_round: "{{ context.exploration_round + 1 }}"
+        code: "{{ output.code }}"
+        ready_to_answer: "{{ output.ready_to_answer }}"
+        findings: "{{ output.findings }}"
+        suggested_chunks: "{{ output.suggested_chunks }}"
       on_error: explore_error
       transitions:
         - to: execute_exploration_code
@@ -132,7 +135,7 @@ data:
         context_content: "{{ context.context_content }}"
         total_length: "{{ context.context_length }}"
       output_to_context:
-        sub_task_results: "{{ output | values | list }}"
+        sub_task_results: "{{ output | dictsort | map(attribute='1') | list }}"
       transitions:
         - to: synthesize
 

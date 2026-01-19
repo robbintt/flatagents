@@ -22,9 +22,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from flatagents import FlatMachine, LoggingHooks, CompositeHooks, setup_logging, get_logger
-
-from .hooks import RLMHooks
+from flatagents import FlatMachine, setup_logging, get_logger
 
 setup_logging(level='INFO')
 logger = get_logger(__name__)
@@ -53,12 +51,8 @@ async def run_rlm(
     if not config_path.exists():
         raise FileNotFoundError(f"Machine config not found: {config_path}")
 
-    # Combine RLM hooks with logging
-    hooks = CompositeHooks([RLMHooks(), LoggingHooks()])
-
     machine = FlatMachine(
-        config_file=str(config_path),
-        hooks=hooks
+        config_file=str(config_path)
     )
 
     logger.info(f"Starting RLM with context of {len(context)} characters")
@@ -178,9 +172,9 @@ async def interactive_mode():
 
 def demo():
     """Run a demo with sample content."""
-    # Generate a sample long document
+    # Generate a sample document with fewer sections to minimize LLM calls
     sample_sections = []
-    for i in range(50):
+    for i in range(5):
         sample_sections.append(f"""
 ## Section {i + 1}: Topic Alpha-{i}
 
@@ -193,7 +187,7 @@ Additional details include:
 - Point B: {i * 7}
 - Point C: {i * 11}
 
-{"IMPORTANT: The secret code is RLM-" + str(42 + i) if i == 27 else ""}
+{"IMPORTANT: The secret code is RLM-" + str(42 + i) if i == 2 else ""}
 """)
 
     context = "\n".join(sample_sections)

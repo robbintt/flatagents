@@ -7,7 +7,6 @@ spec_version: "0.7.6"
 
 data:
   name: chunk-processor
-  profiles: ./profiles.yml
 
   context:
     task: "{{ input.task }}"
@@ -85,7 +84,7 @@ data:
 
   hooks:
     file: "../src/rlm/hooks.py"
-    class: "ChunkProcessorHooks"
+    class: "RLMHooks"
 
 metadata:
   description: "Processes a single chunk for a sub-task"

@@ -6,34 +6,20 @@ spec_version: "0.7.6"
 
 data:
   model_profiles:
-    # Fast model for exploration and simple operations
+    # Fast model with Cerebras GLM for exploration and simple operations
+    # Long context support for RLM workloads
     fast:
-      provider: openai
-      name: gpt-4o-mini
-      temperature: 0.0
-      max_tokens: 4096
+      provider: cerebras
+      name: zai-glm-4.6
+      temperature: 0.1
+      max_tokens: 10000
 
-    # Smart model for complex reasoning and synthesis
+    # Smart model using Anthropic Claude Opus for complex reasoning and synthesis
     smart:
-      provider: openai
-      name: gpt-4o
-      temperature: 0.0
-      max_tokens: 8192
-
-    # Alternative: Anthropic Claude
-    claude-smart:
       provider: anthropic
-      name: claude-sonnet-4-20250514
+      name: claude-opus-4-5-20251101
       temperature: 0.0
       max_tokens: 8192
-
-    # Local development with Ollama
-    local:
-      provider: ollama
-      name: qwen2.5-coder:32b
-      base_url: http://localhost:11434
-      temperature: 0.0
-      max_tokens: 4096
 
   default: smart
 

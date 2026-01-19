@@ -12,7 +12,7 @@ LLMs to handle arbitrarily long contexts through:
 4. Synthesis of sub-task results
 """
 
-from .hooks import RLMHooks, ChunkProcessorHooks
+from .hooks import RLMHooks
 from .repl import REPLExecutor
 
-__all__ = ["RLMHooks", "ChunkProcessorHooks", "REPLExecutor"]
+__all__ = ["RLMHooks", "REPLExecutor"]
