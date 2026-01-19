@@ -325,7 +325,7 @@ export interface BackendConfig {
     results?: "memory" | "redis";
 }
 
-export const SPEC_VERSION = "0.7.4";
+export const SPEC_VERSION = "0.7.5";
 
 /**
  * Wrapper interface for JSON schema generation.

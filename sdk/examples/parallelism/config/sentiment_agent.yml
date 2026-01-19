@@ -2,7 +2,7 @@
 # Analyzes sentiment of text (positive, negative, neutral)
 
 spec: flatagent
-spec_version: "0.7.4"
+spec_version: "0.7.5"
 
 data:
   name: sentiment-agent

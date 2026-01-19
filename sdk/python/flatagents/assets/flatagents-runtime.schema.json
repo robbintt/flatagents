@@ -11,7 +11,7 @@
         },
         "spec_version": {
           "type": "string",
-          "const": "0.7.4"
+          "const": "0.7.5"
         },
         "execution_lock": {
           "$ref": "#/definitions/ExecutionLock"

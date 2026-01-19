@@ -2,7 +2,7 @@
 # Generates implementation plan in plain text
 
 spec: flatagent
-spec_version: "0.7.4"
+spec_version: "0.7.5"
 
 data:
   name: planner

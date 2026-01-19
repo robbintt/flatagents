@@ -2,7 +2,7 @@
 # Generates a specialized creative writing agent based on the task
 
 spec: flatagent
-spec_version: "0.7.4"
+spec_version: "0.7.5"
 
 data:
   name: otf-generator

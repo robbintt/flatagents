@@ -2,7 +2,7 @@
 # Loads a character card PNG and enables chat with the character
 
 spec: flatmachine
-spec_version: "0.7.4"
+spec_version: "0.7.5"
 
 data:
   name: character-card-chat

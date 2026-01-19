@@ -3,7 +3,7 @@
 # Demonstrates: machine peering, self-judging improvement loop, formatted output
 
 spec: flatmachine
-spec_version: "0.7.4"
+spec_version: "0.7.5"
 
 data:
   name: research-pipeline
