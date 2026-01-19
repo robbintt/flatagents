@@ -315,97 +315,112 @@ class FlatMachine:
     def _load_hooks(self, hooks: Optional[MachineHooks]) -> MachineHooks:
         """
         Load hooks from config or use provided/default.
-        
-        Config format (file-based, preferred for self-contained skills):
+
+        Invocation patterns:
+
+        LOCAL (development, single-process):
             hooks:
-              file: "./hooks.py"
+              file: "./hooks.py"    # Relative to config dir
               class: "MyHooks"
-              args:
-                working_dir: "."
-        
-        Config format (module-based, for installed packages):
+            - Loads from file path with sys.path manipulation
+            - Supports sibling imports (from repl import X)
+            - Hooks CAN be stateful (same process)
+
+        DISTRIBUTED (Lambda, Cloud Run, multi-process):
             hooks:
-              module: "mypackage.hooks"
+              module: "mypackage.hooks"  # Installed package
               class: "MyHooks"
-              args:
-                working_dir: "{{ input.working_dir }}"
-        
-        Priority:
-        1. Explicitly passed hooks argument (for programmatic use)
-        2. file: in config (file-based loading)
-        3. module: in config (Python import)
-        4. Default MachineHooks()
+            - Loads from installed package (pip install)
+            - No sys.path manipulation needed
+            - Hooks MUST be stateless (checkpoint/restore loses instance state)
+
+        Priority: explicit arg > file > module > default
         """
-        # If hooks explicitly passed, use them
         if hooks is not None:
             return hooks
-        
-        # Check for hooks config
+
         hooks_config = self.data.get('hooks')
         if not hooks_config:
             return MachineHooks()
-        
+
         class_name = hooks_config.get('class')
         if not class_name:
-            logger.warning(
-                f"Hooks config missing 'class', using default. Config: {hooks_config}"
-            )
+            logger.warning(f"Hooks config missing 'class', using default")
             return MachineHooks()
-        
-        hooks_class = None
-        
-        # Try file-based loading first (for self-contained skills)
-        file_path = hooks_config.get('file')
-        if file_path:
-            if not os.path.isabs(file_path):
-                file_path = os.path.join(self._config_dir, file_path)
-            try:
-                # Add hooks directory to sys.path so sibling modules can be imported
-                # Clean up after exec_module - imports are resolved at load time
-                import sys
-                hooks_dir = os.path.dirname(os.path.abspath(file_path))
-                added = hooks_dir not in sys.path
-                if added:
-                    sys.path.insert(0, hooks_dir)
-                try:
-                    spec = importlib.util.spec_from_file_location("hooks", file_path)
-                    if spec and spec.loader:
-                        module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(module)
-                        hooks_class = getattr(module, class_name)
-                finally:
-                    if added and hooks_dir in sys.path:
-                        sys.path.remove(hooks_dir)
-            except Exception as e:
-                logger.error(f"Failed to load hooks from file {file_path}: {e}")
-        
-        # Fall back to module import
+
+        # Route to appropriate loader based on invocation pattern
+        if hooks_config.get('file'):
+            hooks_class = self._load_hooks_local(hooks_config)
+        elif hooks_config.get('module'):
+            hooks_class = self._load_hooks_distributed(hooks_config)
+        else:
+            logger.warning(f"Hooks config needs 'file' or 'module', using default")
+            return MachineHooks()
+
         if hooks_class is None:
-            module_name = hooks_config.get('module')
-            if not module_name:
-                logger.warning(
-                    f"Hooks config has no 'file' or 'module', using default. "
-                    f"Config: {hooks_config}"
-                )
-                return MachineHooks()
-            try:
-                module = importlib.import_module(module_name)
-                hooks_class = getattr(module, class_name)
-            except (ImportError, AttributeError) as e:
-                logger.error(
-                    f"Failed to load hooks class {class_name} from {module_name}: {e}"
-                )
-                return MachineHooks()
-        
-        # Get args (note: can't render templates here as input not yet available)
-        # Args are passed raw - the hooks class should handle any needed resolution
-        hooks_args = hooks_config.get('args', {})
-        
-        try:
-            return hooks_class(**hooks_args)
-        except Exception as e:
-            logger.error(f"Failed to instantiate hooks class {class_name}: {e}")
             return MachineHooks()
+
+        # Instantiate
+        try:
+            return hooks_class(**hooks_config.get('args', {}))
+        except Exception as e:
+            logger.error(f"Failed to instantiate {class_name}: {e}")
+            return MachineHooks()
+
+    def _load_hooks_local(self, config: Dict[str, Any]) -> Optional[type]:
+        """
+        LOCAL: Load hooks from file path.
+
+        Use for development and single-process execution:
+        - File path relative to machine config
+        - sys.path manipulation for sibling imports
+        - Hooks can be stateful (same process)
+        """
+        import sys
+
+        file_path = config['file']
+        class_name = config['class']
+
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(self._config_dir, file_path)
+
+        hooks_dir = os.path.dirname(os.path.abspath(file_path))
+        added = hooks_dir not in sys.path
+
+        try:
+            if added:
+                sys.path.insert(0, hooks_dir)
+            try:
+                spec = importlib.util.spec_from_file_location("hooks", file_path)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    return getattr(module, class_name)
+            finally:
+                if added and hooks_dir in sys.path:
+                    sys.path.remove(hooks_dir)
+        except Exception as e:
+            logger.error(f"LOCAL hooks failed ({file_path}): {e}")
+        return None
+
+    def _load_hooks_distributed(self, config: Dict[str, Any]) -> Optional[type]:
+        """
+        DISTRIBUTED: Load hooks from installed package.
+
+        Use for Lambda, Cloud Run, checkpoint/restore:
+        - Package installed via pip (requirements.txt)
+        - No sys.path manipulation
+        - Hooks MUST be stateless (state in context)
+        """
+        module_name = config['module']
+        class_name = config['class']
+
+        try:
+            module = importlib.import_module(module_name)
+            return getattr(module, class_name)
+        except (ImportError, AttributeError) as e:
+            logger.error(f"DISTRIBUTED hooks failed ({module_name}.{class_name}): {e}")
+        return None
 
     def _get_agent(self, agent_name: str) -> FlatAgent:
         """Get or load an agent by name."""
