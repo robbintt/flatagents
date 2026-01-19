@@ -1,6 +1,6 @@
 # Chapter Drafter Agent - Writes initial chapter draft
 spec: flatagent
-spec_version: "0.7.3"
+spec_version: "0.7.4"
 
 data:
   name: chapter-drafter

@@ -3,7 +3,7 @@
 # System prompt follows SillyTavern chat completion format
 
 spec: flatagent
-spec_version: "0.7.3"
+spec_version: "0.7.4"
 
 data:
   name: character-responder

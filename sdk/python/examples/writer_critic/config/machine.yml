@@ -2,7 +2,7 @@
 # Demonstrates a feedback loop between two agents
 
 spec: flatmachine
-spec_version: "0.7.3"
+spec_version: "0.7.4"
 
 data:
   name: writer-critic-loop

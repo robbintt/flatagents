@@ -107,7 +107,7 @@
  * base_url          - Custom base URL for the API (e.g., for local models or proxies)
  */
 
-export const SPEC_VERSION = "0.7.3";
+export const SPEC_VERSION = "0.7.4";
 
 export interface ProfilesWrapper {
   spec: "flatprofiles";

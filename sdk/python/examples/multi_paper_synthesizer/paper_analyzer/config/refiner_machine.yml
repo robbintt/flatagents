@@ -4,7 +4,7 @@
 # Loops up to 3 times until quality_score >= 8
 
 spec: flatmachine
-spec_version: "0.7.3"
+spec_version: "0.7.4"
 
 data:
   name: refiner
