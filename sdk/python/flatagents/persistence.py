@@ -47,28 +47,41 @@ class PersistenceBackend(ABC):
 
 class LocalFileBackend(PersistenceBackend):
     """File-based persistence backend."""
-    
+
     def __init__(self, base_dir: str = ".checkpoints"):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    def _validate_key(self, key: str) -> None:
+        """Validate key to prevent path traversal attacks."""
+        if '..' in key or key.startswith('/'):
+            raise ValueError(f"Invalid checkpoint key: {key}")
+
     async def save(self, key: str, value: bytes) -> None:
+        self._validate_key(key)
         path = self.base_dir / key
         path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(path, 'wb') as f:
+
+        # Write to temp file first for atomicity
+        temp_path = path.parent / f".{path.name}.tmp"
+        async with aiofiles.open(temp_path, 'wb') as f:
             await f.write(value)
-    
+
+        # Atomic rename (safe on POSIX and Windows)
+        temp_path.replace(path)
+
     async def load(self, key: str) -> Optional[bytes]:
+        self._validate_key(key)
         path = self.base_dir / key
         if not path.exists():
             return None
         async with aiofiles.open(path, 'rb') as f:
             return await f.read()
-            
+
     async def delete(self, key: str) -> None:
+        self._validate_key(key)
         path = self.base_dir / key
-        if path.exists():
-            path.unlink()
+        path.unlink(missing_ok=True)
 
 class MemoryBackend(PersistenceBackend):
     """In-memory backend for ephemeral executions."""

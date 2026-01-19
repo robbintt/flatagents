@@ -35,10 +35,10 @@ Use FlatAgent alone for simple tasks. Use FlatMachine when you need multi-step w
 
 | Example | What it demonstrates |
 |---------|---------------------|
-| [helloworld](./sdk/python/examples/helloworld) | Minimal setup — single agent, single state machine |
+| [helloworld](./sdk/examples/helloworld/python) | Minimal setup — single agent, single state machine |
 | [writer_critic](./sdk/python/examples/writer_critic) | Multi-agent loop — writer drafts, critic reviews, iterates |
 | [story_writer](./sdk/python/examples/story_writer) | Multi-step creative workflow with chapter generation |
-| [human_in_loop](./sdk/python/examples/human_in_loop) | Pause execution for human approval via hooks |
+| [human_in_loop](./sdk/examples/human-in-the-loop/python) | Pause execution for human approval via hooks |
 | [error_handling](./sdk/python/examples/error_handling) | Error recovery and retry patterns at state machine level |
 | [dynamic_agent](./sdk/python/examples/dynamic_agent) | On-the-fly agent generation from runtime context |
 | [character_card](./sdk/python/examples/character_card) | Loading agent config from character card format |
@@ -47,7 +47,7 @@ Use FlatAgent alone for simple tasks. Use FlatMachine when you need multi-step w
 | [research_paper_analysis](./sdk/python/examples/research_paper_analysis) | Document analysis with structured extraction |
 | [multi_paper_synthesizer](./sdk/python/examples/multi_paper_synthesizer) | Cross-document synthesis with dynamic machine launching |
 | [support_triage_json](./sdk/python/examples/support_triage_json) | JSON input/output with classification pipeline |
-| [parallelism](./sdk/python/examples/parallelism) | Parallel machines, dynamic foreach, fire-and-forget launches |
+| [parallelism](./sdk/examples/parallelism/python) | Parallel machines, dynamic foreach, fire-and-forget launches |
 
 ## Quick Start
 
