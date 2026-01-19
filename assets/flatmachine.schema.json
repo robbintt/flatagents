@@ -79,6 +79,9 @@
         },
         "persistence": {
           "$ref": "#/definitions/PersistenceConfig"
+        },
+        "hooks": {
+          "$ref": "#/definitions/HooksConfig"
         }
       },
       "required": [
@@ -534,9 +537,6 @@
     "MachineSettings": {
       "type": "object",
       "properties": {
-        "hooks": {
-          "type": "string"
-        },
         "max_steps": {
           "type": "number"
         },
@@ -569,6 +569,28 @@
         "enabled",
         "backend"
       ]
+    },
+    "HooksConfig": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "module": {
+          "type": "string"
+        },
+        "class": {
+          "type": "string"
+        },
+        "args": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "additionalProperties": false,
+      "description": "Configuration for loading hooks from file or module.\n\nFile-based (preferred for self-contained skills):   hooks:     file: \"./hooks.py\"     class: \"MyHooks\"     args:       working_dir: \".\"\n\nModule-based (for installed packages):   hooks:     module: \"mypackage.hooks\"     class: \"MyHooks\"     args:       api_key: \"{{ input.api_key }}\"\n\nFields:   file   - Path to Python file containing hooks class (relative to machine.yml)   module - Python module path to import   class  - Class name to instantiate (required)   args   - Arguments to pass to hooks constructor"
     }
   }
 }

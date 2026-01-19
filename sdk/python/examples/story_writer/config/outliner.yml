@@ -1,6 +1,6 @@
 # Story Outliner Agent - Creates story structure
 spec: flatagent
-spec_version: "0.7.5"
+spec_version: "0.7.6"
 
 data:
   name: story-outliner

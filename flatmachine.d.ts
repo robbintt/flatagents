@@ -256,7 +256,7 @@
  * pending_launches    - Outbox pattern (v0.4.0)
  */
 
-export const SPEC_VERSION = "0.7.5";
+export const SPEC_VERSION = "0.7.6";
 
 export interface MachineWrapper {
   spec: "flatmachine";
@@ -274,10 +274,40 @@ export interface MachineData {
   states: Record<string, StateDefinition>;
   settings?: MachineSettings;
   persistence?: PersistenceConfig;
+  hooks?: HooksConfig;
+}
+
+/**
+ * Configuration for loading hooks from file or module.
+ *
+ * File-based (preferred for self-contained skills):
+ *   hooks:
+ *     file: "./hooks.py"
+ *     class: "MyHooks"
+ *     args:
+ *       working_dir: "."
+ *
+ * Module-based (for installed packages):
+ *   hooks:
+ *     module: "mypackage.hooks"
+ *     class: "MyHooks"
+ *     args:
+ *       api_key: "{{ input.api_key }}"
+ *
+ * Fields:
+ *   file   - Path to Python file containing hooks class (relative to machine.yml)
+ *   module - Python module path to import
+ *   class  - Class name to instantiate (required)
+ *   args   - Arguments to pass to hooks constructor
+ */
+export interface HooksConfig {
+  file?: string;
+  module?: string;
+  class: string;
+  args?: Record<string, any>;
 }
 
 export interface MachineSettings {
-  hooks?: string;
   max_steps?: number;
   parallel_fallback?: "sequential" | "error";
   [key: string]: any;

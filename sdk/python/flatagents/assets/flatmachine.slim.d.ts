@@ -1,4 +1,4 @@
-export const SPEC_VERSION = "0.7.5";
+export const SPEC_VERSION = "0.7.6";
 export interface MachineWrapper {
     spec: "flatmachine";
     spec_version: string;
@@ -14,9 +14,15 @@ export interface MachineData {
     states: Record<string, StateDefinition>;
     settings?: MachineSettings;
     persistence?: PersistenceConfig;
+    hooks?: HooksConfig;
+}
+export interface HooksConfig {
+    file?: string;
+    module?: string;
+    class: string;
+    args?: Record<string, any>;
 }
 export interface MachineSettings {
-    hooks?: string;
     max_steps?: number;
     parallel_fallback?: "sequential" | "error";
     [key: string]: any;
