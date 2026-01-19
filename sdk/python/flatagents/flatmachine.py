@@ -360,11 +360,22 @@ class FlatMachine:
             if not os.path.isabs(file_path):
                 file_path = os.path.join(self._config_dir, file_path)
             try:
-                spec = importlib.util.spec_from_file_location("hooks", file_path)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    hooks_class = getattr(module, class_name)
+                # Add hooks directory to sys.path so sibling modules can be imported
+                # Clean up after exec_module - imports are resolved at load time
+                import sys
+                hooks_dir = os.path.dirname(os.path.abspath(file_path))
+                added = hooks_dir not in sys.path
+                if added:
+                    sys.path.insert(0, hooks_dir)
+                try:
+                    spec = importlib.util.spec_from_file_location("hooks", file_path)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        hooks_class = getattr(module, class_name)
+                finally:
+                    if added and hooks_dir in sys.path:
+                        sys.path.remove(hooks_dir)
             except Exception as e:
                 logger.error(f"Failed to load hooks from file {file_path}: {e}")
         
