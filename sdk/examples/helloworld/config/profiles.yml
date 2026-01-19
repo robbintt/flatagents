@@ -2,7 +2,7 @@
 # Centralized model configurations that agents can reference by name
 
 spec: flatprofiles
-spec_version: "0.7.6"
+spec_version: "0.7.7"
 
 data:
   model_profiles:

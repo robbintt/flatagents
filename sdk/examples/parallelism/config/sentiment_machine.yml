@@ -2,7 +2,7 @@
 # Wrapper for sentiment analysis agent
 
 spec: flatmachine
-spec_version: "0.7.6"
+spec_version: "0.7.7"
 
 data:
   name: sentiment-machine

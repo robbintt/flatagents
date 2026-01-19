@@ -3,7 +3,7 @@
 # Called via foreach from the main machine
 
 spec: flatmachine
-spec_version: "0.7.6"
+spec_version: "0.7.7"
 
 data:
   name: chunk-processor
