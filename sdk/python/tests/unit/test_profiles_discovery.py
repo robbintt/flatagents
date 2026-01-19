@@ -275,11 +275,11 @@ data:
 
         machine = FlatMachine(config_file=str(machine_path))
 
-        # Get the agent - machine should pass profiles_file
+        # Get the agent - machine should pass profiles_dict
         agent = machine._get_agent("child")
 
-        # Agent should have received machine's profiles_file
-        assert agent._profiles_file == str(tmp_path / "profiles.yml")
+        # Agent should have received machine's profiles_dict (not profiles_file)
+        assert agent._profiles_dict is not None
         assert agent.model == "anthropic/claude-3-sonnet"
         assert agent.temperature == 0.3
 
