@@ -3,7 +3,7 @@ spec_version: "0.7.7"
 
 data:
   name: writer
-  model: default
+  model: creative
   system: You write short, punchy marketing copy. Be creative and memorable.
   user: |
     Product: {{ input.product }}

@@ -56,11 +56,6 @@ data:
     2. Innovation: The key innovation and how it works technically
     3. Results: Main results with specific numbers/metrics
     4. Impact: Significance and influence on the field
-  
-  output:
-    summary:
-      type: str
-      description: 4-paragraph executive summary
 
 metadata:
   description: "Creates or improves executive summary"

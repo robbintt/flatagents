@@ -3,13 +3,16 @@ spec_version: "0.7.7"
 data:
   name: worker
   model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
-    max_tokens: 64
-  system: "You are a worker processing data. Process your assigned task and return results."
-  user: "Task: {{ task }}, Data: {{ data }}\n\nYour result:"
+    profile: fast
+    max_tokens: 10000
+  system: |
+    You are a worker that completes a single task using the provided data.
+  user: |
+    Task: {{ input.task }}
+    Data: {{ input.data }}
+
+    Your result:
   output:
     result:
-      type: json
+      type: str
       description: "Processed result"

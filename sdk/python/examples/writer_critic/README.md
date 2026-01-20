@@ -16,7 +16,7 @@ This demo showcases:
 ## Prerequisites
 
 1. **Python & `uv`**: Ensure you have Python 3.10+ and the `uv` package manager installed.
-2. **LLM API Key**: An active API key is required. The demo checks for `OPENAI_API_KEY` or `CEREBRAS_API_KEY` environment variables.
+2. **LLM API Key**: An active API key is required. The demo uses `CEREBRAS_API_KEY`.
 
 ## Quick Start (with `run.sh`)
 
@@ -63,9 +63,9 @@ Writer-Critic Demo
 ============================================================
 
 Writer Agent: writer
-Writer Model: cerebras/zai-glm-4.6
+Writer Model: cerebras/zai-glm-4.7
 Critic Agent: critic
-Critic Model: cerebras/zai-glm-4.6
+Critic Model: cerebras/zai-glm-4.7
 
 Product: a CLI tool for AI agents
 Target Score: 8/10
@@ -107,5 +107,5 @@ Estimated cost: $0.0012
 
 ## Agent Configurations
 
-- `config/writer.yml`: Writer agent with higher temperature (0.8) for creativity
-- `config/critic.yml`: Critic agent with lower temperature (0.3) for consistent evaluation
+- `config/writer.yml`: Writer agent using the `creative` profile
+- `config/critic.yml`: Critic agent using the `default` profile

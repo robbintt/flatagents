@@ -21,19 +21,15 @@ data:
     PAPER ANALYSES:
     {{ input.analyses }}
     
-    Identify:
-    1. Common themes: What findings/approaches appear across multiple papers?
-    2. Key differences: Where do the papers diverge in methodology or conclusions?
-    
+    Format your response with these exact headers:
+
+    COMMON THEMES:
+    [What findings/approaches appear across multiple papers]
+
+    KEY DIFFERENCES:
+    [Where the papers diverge in methodology or conclusions]
+
     Be specific and reference individual papers by title.
-  
-  output:
-    common_themes:
-      type: str
-      description: Common themes across papers with citations
-    key_differences:
-      type: str
-      description: Key differences and divergences between papers
 
 metadata:
   description: "Compares findings across multiple papers"

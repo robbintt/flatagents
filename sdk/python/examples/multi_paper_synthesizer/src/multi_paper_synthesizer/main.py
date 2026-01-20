@@ -26,6 +26,43 @@ from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
 setup_logging(level='INFO')
 logger = get_logger(__name__)
 
+
+def extract_section(text: str, header: str) -> str:
+    """Extract content after a header until the next header or end."""
+    if not text:
+        return ""
+    upper = text.upper()
+    start = upper.find(header.upper())
+    if start == -1:
+        return ""
+    start = start + len(header)
+    if start < len(text) and text[start] == ':':
+        start += 1
+    # Find next header
+    markers = ["\nKEY FINDINGS:", "\nMETHODOLOGY:", "\nCONTRIBUTIONS:",
+               "\nTECHNICAL DETAILS:", "\nRESULTS:", "\nCOMMON THEMES:",
+               "\nKEY DIFFERENCES:", "\nRESEARCH GAPS:", "\nOPPORTUNITIES:",
+               "\nQUALITY SCORE:", "\nCRITIQUE:"]
+    end = len(text)
+    for m in markers:
+        pos = upper.find(m, start)
+        if pos != -1 and pos < end:
+            end = pos
+    return text[start:end].strip()
+
+
+def extract_score(text: str) -> int:
+    """Extract quality score number from text."""
+    if not text:
+        return 0
+    idx = text.upper().find("QUALITY SCORE")
+    if idx == -1:
+        return 0
+    for c in text[idx:idx+30]:
+        if c.isdigit():
+            return min(10, max(1, int(c)))
+    return 0
+
 # Directories
 BASE_DIR = Path(__file__).parent.parent.parent
 CONFIG_DIR = BASE_DIR / 'config'
@@ -286,8 +323,9 @@ async def synthesize_papers(
         paper_count=len(paper_analyses),
     )
     
-    result["common_themes"] = compare_result.output.get("common_themes", "") if compare_result.output else ""
-    result["key_differences"] = compare_result.output.get("key_differences", "") if compare_result.output else ""
+    compare_text = compare_result.content or ""
+    result["common_themes"] = extract_section(compare_text, "COMMON THEMES")
+    result["key_differences"] = extract_section(compare_text, "KEY DIFFERENCES")
     
     # Load gap finder
     gap_finder = FlatAgent(config_file=str(CONFIG_DIR / 'gap_finder.yml'))
@@ -298,8 +336,9 @@ async def synthesize_papers(
         analyses=analyses_text,
     )
     
-    result["research_gaps"] = gap_result.output.get("research_gaps", "") if gap_result.output else ""
-    result["opportunities"] = gap_result.output.get("opportunities", "") if gap_result.output else ""
+    gap_text = gap_result.content or ""
+    result["research_gaps"] = extract_section(gap_text, "RESEARCH GAPS")
+    result["opportunities"] = extract_section(gap_text, "OPPORTUNITIES")
     
     # Load synthesizer
     synthesizer = FlatAgent(config_file=str(CONFIG_DIR / 'synthesizer.yml'))
@@ -312,7 +351,7 @@ async def synthesize_papers(
         opportunities=result["opportunities"],
     )
     
-    result["synthesis"] = synth_result.output.get("synthesis", "") if synth_result.output else ""
+    result["synthesis"] = synth_result.content or ""
     
     # Self-judging critique loop
     critic = FlatAgent(config_file=str(CONFIG_DIR / 'critic.yml'))
@@ -323,8 +362,9 @@ async def synthesize_papers(
             paper_count=len(paper_analyses),
         )
         
-        result["quality_score"] = critique_result.output.get("quality_score", 0) if critique_result.output else 0
-        result["critique"] = critique_result.output.get("critique", "") if critique_result.output else ""
+        critique_text = critique_result.content or ""
+        result["quality_score"] = extract_score(critique_text)
+        result["critique"] = extract_section(critique_text, "CRITIQUE")
         
         logger.info(f"Iteration {iteration + 1}: Quality score = {result['quality_score']}/10")
         
@@ -342,7 +382,7 @@ async def synthesize_papers(
             previous_synthesis=result["synthesis"],
             critique=result["critique"],
         )
-        result["synthesis"] = synth_result.output.get("synthesis", result["synthesis"]) if synth_result.output else result["synthesis"]
+        result["synthesis"] = synth_result.content or result["synthesis"]
     
     # Format final report
     formatter = FlatAgent(config_file=str(CONFIG_DIR / 'formatter.yml'))
@@ -357,7 +397,7 @@ async def synthesize_papers(
         quality_score=result["quality_score"],
     )
     
-    result["synthesis_report"] = format_result.output.get("report", "") if format_result.output else ""
+    result["synthesis_report"] = format_result.content or ""
     
     # Save report
     report_path = DATA_DIR / 'synthesis_report.md'

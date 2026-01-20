@@ -1,13 +1,11 @@
 {
   "spec": "flatagent",
-  "spec_version": "0.6.0",
+  "spec_version": "0.7.7",
   "data": {
     "name": "response-drafter",
     "model": {
-      "provider": "cerebras",
-      "name": "zai-glm-4.6",
-      "temperature": 0.4,
-      "max_tokens": 700
+      "profile": "default",
+      "max_tokens": 10000
     },
     "system": "You draft concise customer support responses based on triage context.",
     "user": "Ticket ID: {{ input.ticket_id }}\nCategory: {{ input.category }}\nUrgency: {{ input.urgency }}\nTier: {{ input.customer_tier }}\nTone: {{ input.preferred_tone }}\nTriage summary: {{ input.triage_summary }}\nCustomer message: {{ input.customer_message }}\nDraft a response package that matches the output schema.",

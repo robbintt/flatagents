@@ -5,7 +5,7 @@ spec_version: "0.7.7"
 data:
   name: chapter-reviser
   
-  model: default
+  model: creative
   
   system: |
     You are a skilled fiction editor. Revise drafts based on feedback while 

@@ -7,7 +7,7 @@ spec_version: "0.7.7"
 data:
   name: otf-generator
   
-  model: default
+  model: creative
   
   system: |
     You are an expert at designing specialized AI writing agents.
@@ -19,13 +19,12 @@ data:
     - name: A short name for the specialized agent
     - system: The system prompt for the agent (detailed, personality-rich)  
     - user: The user prompt template (use {{ input.task }} to reference the task)
-    - temperature: A float between 0.0 and 1.0 (0.7-0.9 for poetry/creative)
+    - temperature: Either 0.6 (creative) or 1.0 (default)
     - output_fields: An object defining what the agent should return
     
     Temperature guidelines:
-    - 0.3-0.5 for structured/technical writing
-    - 0.6-0.8 for creative prose
-    - 0.9-1.0 for highly creative/experimental
+    - 1.0 for default/neutral generation
+    - 0.6 for creative writing
     
     If previous concerns are provided, address them in your new design.
   
@@ -55,7 +54,7 @@ data:
       description: "User prompt template"
     temperature:
       type: float
-      description: "Temperature setting (0.0 to 1.0)"
+      description: "Temperature setting (0.6 for creative or 1.0 for default)"
     output_fields:
       type: json
       description: "Output schema as JSON object"

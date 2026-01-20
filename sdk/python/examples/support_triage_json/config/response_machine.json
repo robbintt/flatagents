@@ -1,8 +1,9 @@
 {
   "spec": "flatmachine",
-  "spec_version": "0.3.0",
+  "spec_version": "0.7.7",
   "data": {
     "name": "support-response-flow",
+    "profiles": "./profiles.json",
     "expression_engine": "simple",
     "context": {
       "ticket_id": "{{ input.ticket_id }}",

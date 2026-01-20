@@ -37,11 +37,6 @@ data:
     3. Addresses key differences and how they can be reconciled
     4. Highlights the most important research gaps
     5. Recommends next steps based on the opportunities identified
-  
-  output:
-    synthesis:
-      type: str
-      description: Comprehensive 4-5 paragraph research synthesis
 
 metadata:
   description: "Creates unified synthesis from multiple papers"

@@ -88,7 +88,7 @@ OTF AGENT REVIEW
 
 🤖 GENERATED AGENT: haiku-master
 ──────────────────────────────────────────────────────
-Temperature: 0.8
+Temperature: 0.6
 System Prompt: You are a master of haiku poetry...
 User Prompt Template: {{ input.task }}
 
@@ -109,7 +109,7 @@ Your decision: [a]pprove / [d]eny / [q]uit: _
 The agent lacks specific haiku expertise...
 
 ⚠️  CONCERNS:
-Temperature too low for creative poetry. System prompt
+Temperature should be 0.6 for creative poetry. System prompt
 doesn't mention 5-7-5 syllable structure.
 
 The supervisor rejected this agent. You can only acknowledge.

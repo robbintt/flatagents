@@ -168,6 +168,7 @@ spec_version: "X.X.X"  # Check flatmachine.d.ts SPEC_VERSION constant
 
 data:
   name: example-name
+  profiles: ./profiles.yml
   
   context:
     key: "{{ input.key }}"
@@ -208,10 +209,7 @@ spec_version: "X.X.X"  # Check flatagent.d.ts SPEC_VERSION constant
 data:
   name: agent-name
   
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+  model: default
   
   system: |
     System instructions here.
@@ -226,6 +224,26 @@ data:
 
 metadata:
   description: "Brief description"
+```
+
+### config/profiles.yml
+
+```yaml
+spec: flatprofiles
+spec_version: "X.X.X"  # Check profiles.d.ts SPEC_VERSION constant
+
+data:
+  model_profiles:
+    default:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 1.0
+    creative:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 0.6
+
+  default: default
 ```
 
 ## Custom Hooks (Optional)

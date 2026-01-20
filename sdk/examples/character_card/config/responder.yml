@@ -8,7 +8,7 @@ spec_version: "0.7.7"
 data:
   name: character-responder
   
-  model: default
+  model: creative
   
   # SillyTavern-compatible system prompt format
   system: |

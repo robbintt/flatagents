@@ -148,7 +148,7 @@ class CharacterCardHooks(MachineHooks):
         
         # Load user agent if auto mode
         if self.auto_user:
-            agent_path = Path(__file__).parent.parent.parent / 'config' / 'user_agent.yml'
+            agent_path = Path(__file__).parent.parent.parent.parent / 'config' / 'user_agent.yml'
             self.user_agent = FlatAgent(config_file=str(agent_path))
         
         # Display info

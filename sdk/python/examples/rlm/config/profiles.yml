@@ -6,22 +6,21 @@ spec_version: "0.7.7"
 
 data:
   model_profiles:
-    # Fast model with Cerebras GLM for exploration and simple operations
-    # Long context support for RLM workloads
-    fast:
+    # Default Cerebras GLM profile for RLM workloads
+    default:
       provider: cerebras
-      name: zai-glm-4.6
-      temperature: 0.1
+      name: zai-glm-4.7
+      temperature: 1.0
       max_tokens: 10000
 
-    # Smart model using Anthropic Claude Opus for complex reasoning and synthesis
-    smart:
-      provider: anthropic
-      name: claude-opus-4-5-20251101
-      temperature: 0.0
-      max_tokens: 8192
+    # Creative profile for more expressive synthesis
+    creative:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 0.6
+      max_tokens: 10000
 
-  default: smart
+  default: default
 
 metadata:
   description: "Model profiles for Recursive Language Model example"

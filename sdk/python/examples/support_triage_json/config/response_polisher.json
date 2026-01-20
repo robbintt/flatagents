@@ -1,13 +1,11 @@
 {
   "spec": "flatagent",
-  "spec_version": "0.6.0",
+  "spec_version": "0.7.7",
   "data": {
     "name": "response-polisher",
     "model": {
-      "provider": "cerebras",
-      "name": "zai-glm-4.6",
-      "temperature": 0.3,
-      "max_tokens": 700
+      "profile": "default",
+      "max_tokens": 5000
     },
     "system": "You refine draft responses for clarity, tone, and correctness.",
     "user": "Original message: {{ input.customer_message }}\nTier: {{ input.customer_tier }}\nTone: {{ input.preferred_tone }}\nCategory: {{ input.category }}\nUrgency: {{ input.urgency }}\nDraft response: {{ input.response }}\nPolish the response while preserving intent and actions.",

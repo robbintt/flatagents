@@ -39,7 +39,8 @@ Demonstrates machine-to-machine communication, persistence, and checkpointing in
 peering/
 ├── config/
 │   ├── orchestrator.yml      # Launches worker nodes
-│   └── worker_node.yml      # Processes tasks independently
+│   ├── worker_node.yml       # Processes tasks independently
+│   └── worker_task.yml       # Single-task worker wrapper
 ├── src/
 │   └── peering/
 │       └── main.ts          # Demo application
@@ -54,7 +55,7 @@ peering/
 ```yaml
 states:
   initial:
-    launch: [worker_node.yml]  # Fire-and-forget
+    launch: [worker_node]  # Fire-and-forget
     launch_input:
       tasks: "{{ context.tasks }}"
     transitions:
@@ -65,9 +66,9 @@ states:
 ```yaml
 states:
   process_tasks:
-    foreach: "{{ input.tasks }}"
+    foreach: "{{ context.tasks }}"
     as: task
-    agent: worker.yml
+    machine: worker_task
     output_to_context:
       results: "{{ output }}"
 ```

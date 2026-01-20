@@ -1,0 +1,39 @@
+spec: flatmachine
+spec_version: "0.7.7"
+data:
+  name: peering_demo
+  machines:
+    orchestrator: ./orchestrator.yml
+    worker_node: ./worker_node.yml
+  context:
+    worker_tasks:
+      - task: "summarize"
+        data: "Provide a short summary of early American history (colonial era to the Civil War)."
+      - task: "write"
+        data: "Write a limerick about Greece."
+      - task: "list"
+        data: "List 5 simple recipes that use potatoes."
+  persistence:
+    enabled: true
+    backend: memory
+  states:
+    run_orchestrator:
+      type: initial
+      machine: orchestrator
+      output_to_context:
+        orchestrator_result: "{{ output }}"
+      transitions:
+        - to: run_worker_node
+    run_worker_node:
+      machine: worker_node
+      input:
+        tasks: "{{ context.worker_tasks }}"
+      output_to_context:
+        worker_result: "{{ output }}"
+      transitions:
+        - to: done
+    done:
+      type: final
+      output:
+        orchestrator_result: "{{ context.orchestrator_result }}"
+        worker_node_result: "{{ context.worker_result }}"

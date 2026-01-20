@@ -7,9 +7,7 @@ spec_version: "0.7.7"
 data:
   name: rlm-explorer
 
-  model:
-    profile: "smart"
-    temperature: 0.0
+  model: default
 
   system: |
     You are an RLM (Recursive Language Model) explorer agent. You have access to a very long input stored in a variable called `INPUT` in a Python REPL environment.

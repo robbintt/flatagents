@@ -48,11 +48,6 @@ data:
     - Technical details in a structured format
     - Executive summary prominently displayed
     - A "Quick Facts" sidebar with key metrics
-  
-  output:
-    report:
-      type: str
-      description: Formatted markdown report
 
 metadata:
   description: "Creates formatted markdown report"

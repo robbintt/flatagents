@@ -169,17 +169,17 @@ Edit `config/profiles.yml` to configure models:
 ```yaml
 data:
   model_profiles:
-    fast:
-      provider: openai
-      name: gpt-4o-mini
-      temperature: 0.0
+    default:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 1.0
 
-    smart:
-      provider: anthropic
-      name: claude-sonnet-4-20250514
-      temperature: 0.0
+    creative:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 0.6
 
-  default: smart
+  default: default
 ```
 
 ### Machine Settings

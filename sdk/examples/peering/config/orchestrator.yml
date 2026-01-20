@@ -2,21 +2,23 @@ spec: flatmachine
 spec_version: "0.7.7"
 data:
   name: orchestrator
+  machines:
+    worker_node: ./worker_node.yml
   context:
     tasks:
       - task: "summarize"
-        data: "Large text data to summarize"
-      - task: "analyze"
-        data: "Data to analyze"
-      - task: "translate"
-        data: "Text to translate"
+        data: "Provide a short summary of early American history (colonial era to the Civil War)."
+      - task: "write"
+        data: "Write a limerick about Greece."
+      - task: "list"
+        data: "List 5 simple recipes that use potatoes."
   persistence:
     enabled: true
     backend: memory
   states:
     initial:
       type: initial
-      launch: [worker_node.yml]
+      launch: [worker_node]
       launch_input:
         tasks: "{{ context.tasks }}"
       transitions:

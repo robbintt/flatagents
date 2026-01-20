@@ -14,12 +14,9 @@ data:
     authors: "{{ input.authors }}"
     abstract: "{{ input.abstract }}"
     section_text: "{{ input.section_text }}"
-    # Analysis outputs
-    key_findings: null
-    methodology: null
-    contributions: null
-    technical_details: null
-    results: null
+    # Full text outputs from agents
+    abstract_analysis: null
+    section_analysis: null
   
   agents:
     abstract_analyzer: ./abstract_analyzer.yml
@@ -41,9 +38,7 @@ data:
         authors: "{{ context.authors }}"
         abstract: "{{ context.abstract }}"
       output_to_context:
-        key_findings: "{{ output.key_findings }}"
-        methodology: "{{ output.methodology }}"
-        contributions: "{{ output.contributions }}"
+        abstract_analysis: content
       transitions:
         - to: analyze_sections
 
@@ -54,22 +49,18 @@ data:
         backoffs: [2, 8]
       input:
         title: "{{ context.title }}"
-        key_findings: "{{ context.key_findings }}"
+        key_findings: "{{ context.abstract_analysis }}"
         section_text: "{{ context.section_text }}"
       output_to_context:
-        technical_details: "{{ output.technical_details }}"
-        results: "{{ output.results }}"
+        section_analysis: content
       transitions:
         - to: done
 
     done:
       type: final
       output:
-        key_findings: "{{ context.key_findings }}"
-        methodology: "{{ context.methodology }}"
-        contributions: "{{ context.contributions }}"
-        technical_details: "{{ context.technical_details }}"
-        results: "{{ context.results }}"
+        abstract_analysis: "{{ context.abstract_analysis }}"
+        section_analysis: "{{ context.section_analysis }}"
 
 metadata:
   description: "Peer machine for paper content analysis"

@@ -3,13 +3,10 @@ spec_version: "0.7.7"
 
 data:
   model_profiles:
-    default:
+    fast:
       provider: cerebras
       name: zai-glm-4.7
       temperature: 1.0
-    creative:
-      provider: cerebras
-      name: zai-glm-4.7
-      temperature: 0.6
+      max_tokens: 10000
 
-  default: default
+  default: fast

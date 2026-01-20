@@ -1,13 +1,11 @@
 {
   "spec": "flatagent",
-  "spec_version": "0.6.0",
+  "spec_version": "0.7.7",
   "data": {
     "name": "support-triage",
     "model": {
-      "provider": "cerebras",
-      "name": "zai-glm-4.6",
-      "temperature": 0.2,
-      "max_tokens": 512
+      "profile": "default",
+      "max_tokens": 5000
     },
     "system": "You are a support triage agent. Classify the ticket and decide if a response is needed.",
     "user": "Ticket ID: {{ input.ticket_id }}\nCustomer tier: {{ input.customer_tier }}\nMessage: {{ input.customer_message }}\nReturn a JSON classification that matches the output schema.",

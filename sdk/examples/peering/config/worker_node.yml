@@ -2,21 +2,24 @@ spec: flatmachine
 spec_version: "0.7.7"
 data:
   name: worker_node
-  context: {}
+  context:
+    tasks: "{{ input.tasks }}"
+  machines:
+    worker_task: ./worker_task.yml
   persistence:
     enabled: true
     backend: memory
   states:
     process_tasks:
       type: initial
-      foreach: "{{ input.tasks | dump }}"
+      foreach: "{{ context.tasks }}"
       as: task
-      agent: worker.yml
+      machine: worker_task
       input:
         task: "{{ task.task }}"
         data: "{{ task.data }}"
       output_to_context:
-        results: "{{ output | dump }}"
+        results: "{{ output }}"
       transitions:
         - to: final
     final:

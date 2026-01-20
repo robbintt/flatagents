@@ -26,19 +26,15 @@ data:
     
     PAPER COUNT: {{ input.paper_count }}
     
-    Identify:
-    1. Research gaps: What questions do these papers leave unanswered?
-    2. Opportunities: What new research directions could build on this work?
-    
+    Format your response with these exact headers:
+
+    RESEARCH GAPS:
+    [What questions do these papers leave unanswered]
+
+    OPPORTUNITIES:
+    [What new research directions could build on this work]
+
     Focus on actionable, specific gaps rather than generic observations.
-  
-  output:
-    research_gaps:
-      type: str
-      description: Specific unanswered questions in the literature
-    opportunities:
-      type: str
-      description: Concrete research opportunities
 
 metadata:
   description: "Identifies research gaps and opportunities"

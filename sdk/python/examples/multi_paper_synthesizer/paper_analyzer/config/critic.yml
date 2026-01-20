@@ -35,14 +35,13 @@ data:
     - Impact statement: Does it explain why this matters?
     
     Be harsh but fair. Only 8+ if truly excellent.
-  
-  output:
-    quality_score:
-      type: int
-      description: Quality score from 1-10
-    critique:
-      type: str
-      description: Specific improvements needed (or praise if 8+)
+
+    Format your response with these exact headers:
+
+    QUALITY SCORE: [number 1-10]
+
+    CRITIQUE:
+    [Specific improvements needed, or praise if 8+]
 
 metadata:
   description: "Judges summary quality and provides critique"

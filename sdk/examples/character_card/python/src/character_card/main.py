@@ -45,7 +45,7 @@ async def run(
         logger.error(f"Card file not found: {card_path}")
         return None
     
-    config_path = Path(__file__).parent.parent.parent / 'config' / 'machine.yml'
+    config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'machine.yml'
     machine = FlatMachine(
         config_file=str(config_path),
         hooks=CharacterCardHooks(
@@ -118,4 +118,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -16,23 +16,22 @@ optimization:
   max_retries: 3
 
 models:
-  # All agents use Cerebras zai-glm-4.6
-  # Temperature: 0.6 for analytical tasks, 1.0 for creative tasks
+  # All agents use Cerebras zai-glm-4.7
+  # Temperature: 1.0 by default, 0.6 for creative tasks
   default:
     provider: cerebras
-    name: zai-glm-4.6
+    name: zai-glm-4.7
+    temperature: 1.0
 
   # Task model - the judge being optimized (analytical)
   task:
     provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+    name: zai-glm-4.7
 
   # Reflection model - analyzes failures and proposes improvements (analytical)
   reflection:
     provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.6
+    name: zai-glm-4.7
 
 evaluation:
   # Minimum number of evaluation examples required

@@ -24,17 +24,13 @@ data:
     SECTIONS:
     {{ input.section_text }}
     
-    Extract:
-    1. Technical details about the approach/architecture
-    2. Key experimental results and metrics
-  
-  output:
-    technical_details:
-      type: str
-      description: Technical details about the approach
-    results:
-      type: str
-      description: Key experimental results and metrics
+    Format your response with these exact headers:
+
+    TECHNICAL DETAILS:
+    [Technical details about the approach/architecture]
+
+    RESULTS:
+    [Key experimental results and metrics]
 
 metadata:
   description: "Analyzes paper sections for technical depth"

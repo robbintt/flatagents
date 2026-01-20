@@ -129,7 +129,7 @@ class OTFAgentHooks(MachineHooks):
         name = context.get("otf_name", "otf-agent")
         system = context.get("otf_system", "You are a helpful creative writer.")
         user = context.get("otf_user", "{{ input.task }}")
-        temperature = context.get("otf_temperature", 0.7)
+        temperature = context.get("otf_temperature", 0.6)
         output_fields_raw = context.get("otf_output_fields", "{}")
         
         print("\n" + "=" * 70)
@@ -162,23 +162,23 @@ class OTFAgentHooks(MachineHooks):
                 "content": {"type": "str", "description": "The creative writing output"}
             }
         
-        # Ensure temperature is a float
+        # Ensure temperature is a float and clamp to allowed profile temps
         if isinstance(temperature, str):
             try:
                 temperature = float(temperature)
             except ValueError:
-                temperature = 0.7
+                temperature = 0.6
+        if temperature != 1.0:
+            temperature = 0.6
+
+        profile_name = "creative" if temperature == 0.6 else "default"
         
         agent_config = {
             "spec": "flatagent",
-            "spec_version": "0.6.0",
+            "spec_version": "0.7.7",
             "data": {
                 "name": name,
-                "model": {
-                    "provider": "cerebras",
-                    "name": "zai-glm-4.6",
-                    "temperature": temperature
-                },
+                "model": profile_name,
                 "system": system,
                 "user": user,
                 "output": output_schema
@@ -187,7 +187,8 @@ class OTFAgentHooks(MachineHooks):
         
         try:
             # Create the agent
-            agent = FlatAgent(config_dict=agent_config)
+            profiles_dict = context.get("_profiles")
+            agent = FlatAgent(config_dict=agent_config, profiles_dict=profiles_dict)
             self.metrics["agents_generated"] += 1
             
             # Execute it

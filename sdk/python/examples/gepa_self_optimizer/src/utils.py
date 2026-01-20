@@ -10,6 +10,9 @@ import yaml
 
 from flatagents import FlatAgent, get_logger
 
+CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+PROFILES_PATH = CONFIG_DIR / "profiles.yml"
+
 
 def load_yaml(path: Path) -> dict:
     """Load a YAML file."""
@@ -39,12 +42,14 @@ def save_json(data: Any, path: Path) -> None:
 
 def load_agent(config_path: Path) -> FlatAgent:
     """Load a flatagent from a config file."""
-    return FlatAgent(config_file=str(config_path))
+    profiles_file = str(PROFILES_PATH) if PROFILES_PATH.exists() else None
+    return FlatAgent(config_file=str(config_path), profiles_file=profiles_file)
 
 
 def create_agent_from_dict(config: dict) -> FlatAgent:
     """Create a flatagent from a config dictionary."""
-    return FlatAgent(config_dict=config)
+    profiles_file = str(PROFILES_PATH) if PROFILES_PATH.exists() else None
+    return FlatAgent(config_dict=config, profiles_file=profiles_file)
 
 
 def update_agent_prompts(

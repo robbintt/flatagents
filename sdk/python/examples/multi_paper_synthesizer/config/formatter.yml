@@ -43,11 +43,6 @@ data:
     - Key differences in a comparison format
     - Research gaps and opportunities sections
     - Recommendations for future research
-  
-  output:
-    report:
-      type: str
-      description: Formatted markdown synthesis report
 
 metadata:
   description: "Formats multi-paper synthesis as markdown"

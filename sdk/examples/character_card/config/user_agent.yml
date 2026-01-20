@@ -7,7 +7,7 @@ spec_version: "0.7.7"
 data:
   name: user-agent
   
-  model: default
+  model: creative
   
   system: |
     You are roleplaying as {{ input.user_name }} in a conversation with {{ input.card_name }}.

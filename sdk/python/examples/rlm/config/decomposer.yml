@@ -7,9 +7,7 @@ spec_version: "0.7.7"
 data:
   name: rlm-decomposer
 
-  model:
-    profile: "smart"
-    temperature: 0.0
+  model: default
 
   system: |
     You are an RLM (Recursive Language Model) decomposer agent. Your job is to break down a complex task over a long context into smaller, independent sub-tasks.

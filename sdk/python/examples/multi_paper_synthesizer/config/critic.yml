@@ -29,14 +29,13 @@ data:
     - Is the narrative coherent and well-structured?
     - Are the gaps and opportunities well-identified?
     - Is it actionable for researchers?
-  
-  output:
-    quality_score:
-      type: int
-      description: Quality score 1-10
-    critique:
-      type: str
-      description: Specific improvements needed
+
+    Format your response with these exact headers:
+
+    QUALITY SCORE: [number 1-10]
+
+    CRITIQUE:
+    [Specific improvements needed]
 
 metadata:
   description: "Evaluates synthesis quality"

@@ -11,19 +11,14 @@ data:
   profiles: ./profiles.yml
   
   context:
-    # Input from parent
+    # Input from parent (now receives full text analyses)
     title: "{{ input.title }}"
     authors: "{{ input.authors }}"
-    key_findings: "{{ input.key_findings }}"
-    methodology: "{{ input.methodology }}"
-    contributions: "{{ input.contributions }}"
-    technical_details: "{{ input.technical_details }}"
-    results: "{{ input.results }}"
+    analysis: "{{ input.analysis }}"
     reference_count: "{{ input.reference_count }}"
     # Refinement state
     summary: null
-    critique: null
-    quality_score: 0
+    critique_text: null
     iteration: 0
   
   agents:
@@ -36,7 +31,7 @@ data:
       transitions:
         - to: synthesize
 
-    # Generate or improve summary
+    # Generate summary from analysis
     synthesize:
       agent: synthesizer
       execution:
@@ -45,17 +40,17 @@ data:
       input:
         title: "{{ context.title }}"
         authors: "{{ context.authors }}"
-        key_findings: "{{ context.key_findings }}"
-        methodology: "{{ context.methodology }}"
-        contributions: "{{ context.contributions }}"
-        technical_details: "{{ context.technical_details }}"
-        results: "{{ context.results }}"
+        key_findings: "{{ context.analysis }}"
+        methodology: "{{ context.analysis }}"
+        contributions: "{{ context.analysis }}"
+        technical_details: "{{ context.analysis }}"
+        results: "{{ context.analysis }}"
         reference_count: "{{ context.reference_count }}"
         previous_summary: "{{ context.summary }}"
-        critique: "{{ context.critique }}"
+        critique: "{{ context.critique_text }}"
         iteration: "{{ context.iteration }}"
       output_to_context:
-        summary: "{{ output.summary }}"
+        summary: content
         iteration: "{{ context.iteration + 1 }}"
       transitions:
         - to: critique
@@ -69,24 +64,20 @@ data:
       input:
         title: "{{ context.title }}"
         summary: "{{ context.summary }}"
-        key_findings: "{{ context.key_findings }}"
-        methodology: "{{ context.methodology }}"
+        key_findings: "{{ context.analysis }}"
+        methodology: "{{ context.analysis }}"
       output_to_context:
-        quality_score: "{{ output.quality_score }}"
-        critique: "{{ output.critique }}"
+        critique_text: content
       transitions:
-        # Accept if quality >= 8 or max iterations (3) reached
-        - condition: "context.quality_score >= 8 or context.iteration >= 3"
+        # Loop max 3 times (can't parse score from text in machine)
+        - condition: "context.iteration >= 3"
           to: done
-        # Otherwise, refine again
         - to: synthesize
 
     done:
       type: final
       output:
         summary: "{{ context.summary }}"
-        quality_score: "{{ context.quality_score }}"
-        iterations: "{{ context.iteration }}"
 
 metadata:
   description: "Self-judging refinement loop for summary quality"

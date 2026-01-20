@@ -5,7 +5,7 @@ spec_version: "0.7.7"
 data:
   name: chapter-drafter
   
-  model: default
+  model: creative
   
   system: |
     You are a creative fiction writer. Write engaging prose with vivid descriptions,

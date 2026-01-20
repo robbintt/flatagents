@@ -371,16 +371,12 @@ def _gather_traces(self, examples: list[dict], result: EvaluationResult) -> list
 
 ```yaml
 spec: flatagent
-spec_version: "0.6.0"
+spec_version: "0.7.7"
 
 data:
   name: reflective-updater
 
-  model:
-    provider: cerebras
-    name: zai-glm-4.6
-    temperature: 0.7
-    max_tokens: 8192
+  model: default
 
   system: |
     You are a prompt improvement specialist. Your task is to write improved

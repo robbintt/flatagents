@@ -18,16 +18,9 @@ data:
     section_text: "{{ input.section_text }}"
     reference_count: "{{ input.reference_count }}"
     references_sample: "{{ input.references_sample | tojson }}"
-    # Analysis results (from peer machines)
-    key_findings: null
-    methodology: null
-    contributions: null
-    technical_details: null
-    results: null
-    # Refined summary
+    # Full text analysis (from peer machines)
+    analysis: null
     summary: null
-    quality_score: 0
-    # Final formatted output
     formatted_report: null
   
   agents:
@@ -53,29 +46,20 @@ data:
         abstract: "{{ context.abstract }}"
         section_text: "{{ context.section_text }}"
       output_to_context:
-        key_findings: "{{ output.key_findings }}"
-        methodology: "{{ output.methodology }}"
-        contributions: "{{ output.contributions }}"
-        technical_details: "{{ output.technical_details }}"
-        results: "{{ output.results }}"
+        analysis: "{{ output.abstract_analysis }}\n\n{{ output.section_analysis }}"
       transitions:
         - to: refine
 
-    # Step 2: Launch refiner peer machine (self-judging loop)
+    # Step 2: Launch refiner peer machine
     refine:
       machine: refiner
       input:
         title: "{{ context.title }}"
         authors: "{{ context.authors }}"
-        key_findings: "{{ context.key_findings }}"
-        methodology: "{{ context.methodology }}"
-        contributions: "{{ context.contributions }}"
-        technical_details: "{{ context.technical_details }}"
-        results: "{{ context.results }}"
+        analysis: "{{ context.analysis }}"
         reference_count: "{{ context.reference_count }}"
       output_to_context:
-        summary: "{{ output.summary }}"
-        quality_score: "{{ output.quality_score }}"
+        summary: output.summary
       transitions:
         - to: format
 
@@ -88,16 +72,16 @@ data:
       input:
         title: "{{ context.title }}"
         authors: "{{ context.authors }}"
-        key_findings: "{{ context.key_findings }}"
-        methodology: "{{ context.methodology }}"
-        contributions: "{{ context.contributions }}"
-        technical_details: "{{ context.technical_details }}"
-        results: "{{ context.results }}"
+        key_findings: "{{ context.analysis }}"
+        methodology: "{{ context.analysis }}"
+        contributions: "{{ context.analysis }}"
+        technical_details: "{{ context.analysis }}"
+        results: "{{ context.analysis }}"
         summary: "{{ context.summary }}"
-        quality_score: "{{ context.quality_score }}"
+        quality_score: "N/A"
         reference_count: "{{ context.reference_count }}"
       output_to_context:
-        formatted_report: "{{ output.report }}"
+        formatted_report: content
       transitions:
         - to: done
 
@@ -105,9 +89,8 @@ data:
       type: final
       output:
         title: "{{ context.title }}"
-        key_findings: "{{ context.key_findings }}"
+        key_findings: "{{ context.analysis }}"
         summary: "{{ context.summary }}"
-        quality_score: "{{ context.quality_score }}"
         formatted_report: "{{ context.formatted_report }}"
         citation_count: "{{ context.reference_count }}"
 
