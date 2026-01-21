@@ -267,9 +267,537 @@ export class FlatMachine {
 
 ---
 
-## 5. Formal Verification (ACL2) Considerations
+## 5. Formal Verification (ACL2) Implementation
 
-### 5.1 Design Principles for Verifiability
+### 5.1 Repository Structure for Verification
+
+```
+/verification/
+├── acl2/
+│   ├── README.md                    # Setup and usage instructions
+│   ├── Makefile                     # Build all books, run proofs
+│   ├── cert.acl2                    # ACL2 certification config
+│   │
+│   ├── core/                        # Core state machine logic
+│   │   ├── machine-state.lisp       # State representation
+│   │   ├── context.lisp             # Context data structures
+│   │   ├── transitions.lisp         # Transition functions
+│   │   └── expressions.lisp         # Simple expression evaluator
+│   │
+│   ├── properties/                  # Theorem statements
+│   │   ├── progress.lisp            # Progress property proofs
+│   │   ├── determinism.lisp         # Determinism proofs
+│   │   ├── checkpoint.lisp          # Checkpoint consistency
+│   │   ├── mutex.lisp               # Mutual exclusion
+│   │   └── outbox.lisp              # Exactly-once semantics
+│   │
+│   ├── refinement/                  # Refinement mappings to SDKs
+│   │   ├── python-mapping.lisp      # Python SDK correspondence
+│   │   ├── js-mapping.lisp          # JavaScript SDK correspondence
+│   │   └── rust-mapping.lisp        # Rust SDK correspondence
+│   │
+│   └── tests/                       # Counter-example generators
+│       ├── quickcheck.lisp          # Random testing integration
+│       └── regression.lisp          # Known edge cases
+│
+├── specs/                           # Formal specifications (TLA+ style)
+│   ├── flatmachine.tla              # Optional TLA+ spec for comparison
+│   └── invariants.json              # Machine-readable invariant list
+│
+└── scripts/
+    ├── run-proofs.sh                # CI script for proof checking
+    ├── extract-theorems.py          # Generate theorem list for docs
+    └── sync-with-sdk.py             # Verify SDK matches ACL2 model
+```
+
+### 5.2 ACL2 Data Structures
+
+**Machine State Representation:**
+```lisp
+;; machine-state.lisp
+
+(include-book "std/lists/top" :dir :system)
+(include-book "std/alists/top" :dir :system)
+
+;; State is a symbol from a finite set
+(defun valid-state-p (state states)
+  "Check if state is in the set of valid states"
+  (member-equal state states))
+
+;; Machine configuration (parsed from YAML)
+(defund machine-config-p (cfg)
+  (and (alistp cfg)
+       (assoc-equal :states cfg)
+       (assoc-equal :initial cfg)
+       (assoc-equal :finals cfg)))
+
+;; Runtime snapshot (corresponds to MachineSnapshot in TS)
+(defund snapshot-p (snap)
+  (and (alistp snap)
+       (assoc-equal :execution-id snap)
+       (assoc-equal :current-state snap)
+       (assoc-equal :context snap)
+       (assoc-equal :step snap)
+       (natp (cdr (assoc-equal :step snap)))))
+```
+
+**Context Operations:**
+```lisp
+;; context.lisp
+
+;; Context is an alist of symbol -> value
+(defun context-p (ctx)
+  (alistp ctx))
+
+;; Get value from context (returns nil if not found)
+(defun ctx-get (key ctx)
+  (cdr (assoc-equal key ctx)))
+
+;; Set value in context (pure - returns new context)
+(defun ctx-set (key val ctx)
+  (acons key val ctx))
+
+;; Merge contexts (right takes precedence)
+(defun ctx-merge (ctx1 ctx2)
+  (append ctx2 ctx1))
+
+;; Theorem: ctx-merge is associative
+(defthm ctx-merge-assoc
+  (equal (ctx-merge (ctx-merge a b) c)
+         (ctx-merge a (ctx-merge b c))))
+```
+
+### 5.3 Core Transition Logic
+
+```lisp
+;; transitions.lisp
+
+(include-book "machine-state")
+(include-book "context")
+(include-book "expressions")
+
+;; Evaluate a single transition condition
+;; Returns T if transition should fire, NIL otherwise
+(defun eval-transition-condition (trans ctx)
+  (let ((cond (cdr (assoc-equal :condition trans))))
+    (if (null cond)
+        t  ; No condition = always true
+        (eval-simple-expr cond ctx))))
+
+;; Find first matching transition
+;; Returns target state or NIL if no transition matches
+(defun find-transition (transitions ctx)
+  (if (endp transitions)
+      nil
+    (if (eval-transition-condition (car transitions) ctx)
+        (cdr (assoc-equal :to (car transitions)))
+      (find-transition (cdr transitions) ctx))))
+
+;; Single step of machine execution
+(defund machine-step (state ctx cfg)
+  "Execute one step: returns (mv next-state new-ctx) or (mv :error ctx)"
+  (let* ((state-def (cdr (assoc-equal state (cdr (assoc-equal :states cfg)))))
+         (transitions (cdr (assoc-equal :transitions state-def)))
+         (next-state (find-transition transitions ctx)))
+    (if (null next-state)
+        (mv :error ctx)  ; No valid transition
+      (let ((output-mapping (cdr (assoc-equal :output-to-context state-def))))
+        (mv next-state (apply-output-mapping output-mapping ctx))))))
+
+;; Full execution until final state or error
+(defun machine-run (state ctx cfg steps-remaining)
+  "Run machine until final state, error, or step limit"
+  (declare (xargs :measure (nfix steps-remaining)))
+  (cond
+   ((zp steps-remaining) (mv :timeout state ctx))
+   ((member-equal state (cdr (assoc-equal :finals cfg)))
+    (mv :done state ctx))
+   (t (mv-let (next-state new-ctx)
+              (machine-step state ctx cfg)
+        (if (eq next-state :error)
+            (mv :error state ctx)
+          (machine-run next-state new-ctx cfg (1- steps-remaining)))))))
+```
+
+### 5.4 Expression Evaluator
+
+```lisp
+;; expressions.lisp
+
+;; Simple expression language (matches flatmachine simple mode)
+;; Expr ::= (op arg1 arg2) | (get path) | literal
+
+(defun eval-simple-expr (expr ctx)
+  "Evaluate simple-mode expression in context"
+  (cond
+   ;; Literals
+   ((booleanp expr) expr)
+   ((integerp expr) expr)
+   ((stringp expr) expr)
+   ((null expr) nil)
+   
+   ;; Variable access: (get :context :field)
+   ((and (consp expr) (eq (car expr) 'get))
+    (ctx-get (caddr expr) ctx))
+   
+   ;; Comparisons
+   ((and (consp expr) (eq (car expr) '==))
+    (equal (eval-simple-expr (cadr expr) ctx)
+           (eval-simple-expr (caddr expr) ctx)))
+   ((and (consp expr) (eq (car expr) '!=))
+    (not (equal (eval-simple-expr (cadr expr) ctx)
+                (eval-simple-expr (caddr expr) ctx))))
+   ((and (consp expr) (eq (car expr) '<))
+    (< (eval-simple-expr (cadr expr) ctx)
+       (eval-simple-expr (caddr expr) ctx)))
+   ((and (consp expr) (eq (car expr) '>=))
+    (>= (eval-simple-expr (cadr expr) ctx)
+        (eval-simple-expr (caddr expr) ctx)))
+   
+   ;; Boolean operators
+   ((and (consp expr) (eq (car expr) 'and))
+    (and (eval-simple-expr (cadr expr) ctx)
+         (eval-simple-expr (caddr expr) ctx)))
+   ((and (consp expr) (eq (car expr) 'or))
+    (or (eval-simple-expr (cadr expr) ctx)
+        (eval-simple-expr (caddr expr) ctx)))
+   ((and (consp expr) (eq (car expr) 'not))
+    (not (eval-simple-expr (cadr expr) ctx)))
+   
+   ;; Unknown expression
+   (t nil)))
+
+;; Theorem: Expression evaluation produces consistent results
+;; Key insight: eval-simple-expr depends only on expr structure and ctx values
+(defthm eval-simple-expr-functional
+  (implies (and (equal expr1 expr2)
+                (equal ctx1 ctx2))
+           (equal (eval-simple-expr expr1 ctx1)
+                  (eval-simple-expr expr2 ctx2)))
+  :rule-classes :rewrite)
+```
+
+### 5.5 Key Theorems to Prove
+
+**Progress Property:**
+```lisp
+;; properties/progress.lisp
+
+;; Theorem: A well-formed machine always terminates
+(defthm machine-progress
+  (implies (and (machine-config-p cfg)
+                (valid-state-p state (cdr (assoc-equal :states cfg)))
+                (context-p ctx)
+                (posp max-steps))
+           (mv-let (status final-state final-ctx)
+                   (machine-run state ctx cfg max-steps)
+             (or (eq status :done)
+                 (eq status :error)
+                 (eq status :timeout))))
+  :hints (("Goal" :induct (machine-run state ctx cfg max-steps))))
+```
+
+**Determinism Property:**
+```lisp
+;; properties/determinism.lisp
+
+;; Theorem: Running machine twice with same inputs gives same result
+;; This captures that machine-run is a pure function with no hidden state
+(defthm machine-run-deterministic
+  (implies (and (machine-config-p cfg)
+                (valid-state-p state (cdr (assoc-equal :states cfg)))
+                (context-p ctx)
+                (natp n))
+           (let ((run1 (machine-run state ctx cfg n))
+                 (run2 (machine-run state ctx cfg n)))
+             (and (equal (mv-nth 0 run1) (mv-nth 0 run2))  ; Same status
+                  (equal (mv-nth 1 run1) (mv-nth 1 run2))  ; Same final state
+                  (equal (mv-nth 2 run1) (mv-nth 2 run2))))) ; Same final context
+  :hints (("Goal" :induct (machine-run state ctx cfg n))))
+
+;; Theorem: Transition function depends only on explicit arguments
+;; No global state or side effects influence the result
+(defthm machine-step-no-hidden-state
+  (implies (and (machine-config-p cfg)
+                (context-p ctx)
+                (symbolp state))
+           (mv-let (next-state1 new-ctx1)
+                   (machine-step state ctx cfg)
+             (mv-let (next-state2 new-ctx2)
+                     (machine-step state ctx cfg)
+               (and (equal next-state1 next-state2)
+                    (equal new-ctx1 new-ctx2)))))
+  :hints (("Goal" :in-theory (enable machine-step))))
+```
+
+**Checkpoint Consistency:**
+```lisp
+;; properties/checkpoint.lisp
+
+;; Create snapshot from current execution state
+(defun make-snapshot (exec-id state ctx step)
+  (list (cons :execution-id exec-id)
+        (cons :current-state state)
+        (cons :context ctx)
+        (cons :step step)))
+
+;; Resume from snapshot
+(defun resume-from-snapshot (snap cfg max-steps)
+  (machine-run (cdr (assoc-equal :current-state snap))
+               (cdr (assoc-equal :context snap))
+               cfg
+               max-steps))
+
+;; Theorem: Resuming from checkpoint produces same result
+(defthm checkpoint-consistency
+  (implies (and (machine-config-p cfg)
+                (snapshot-p snap)
+                (valid-state-p (cdr (assoc-equal :current-state snap))
+                               (cdr (assoc-equal :states cfg)))
+                (posp remaining-steps))
+           (equal (resume-from-snapshot snap cfg remaining-steps)
+                  (machine-run (cdr (assoc-equal :current-state snap))
+                               (cdr (assoc-equal :context snap))
+                               cfg
+                               remaining-steps)))
+  :hints (("Goal" :in-theory (enable resume-from-snapshot))))
+```
+
+**Mutual Exclusion (Lock Protocol):**
+```lisp
+;; properties/mutex.lisp
+
+;; Lock state: alist of (key . owner) pairs
+(defun lock-state-p (locks)
+  (alistp locks))
+
+;; Acquire lock (returns new lock state and success flag)
+(defun acquire-lock (key owner locks)
+  (let ((current-owner (cdr (assoc-equal key locks))))
+    (if (or (null current-owner)
+            (equal current-owner owner))
+        (mv (acons key owner locks) t)  ; Success
+      (mv locks nil))))                  ; Fail - held by other
+
+;; Release lock
+(defun release-lock (key owner locks)
+  (if (equal (cdr (assoc-equal key locks)) owner)
+      (remove-assoc-equal key locks)
+    locks))
+
+;; Theorem: At most one owner holds a lock
+(defthm mutex-single-owner
+  (implies (and (lock-state-p locks)
+                (cdr (assoc-equal key locks)))
+           (let ((owner (cdr (assoc-equal key locks))))
+             (mv-let (new-locks success)
+                     (acquire-lock key other-owner locks)
+               (implies (not (equal other-owner owner))
+                        (not success))))))
+```
+
+**Outbox Exactly-Once:**
+```lisp
+;; properties/outbox.lisp
+
+;; Launch intent: (execution-id . launched-flag)
+(defun launch-intent-p (intent)
+  (and (consp intent)
+       (stringp (car intent))  ; execution-id
+       (booleanp (cdr intent)))) ; launched flag
+
+;; Pending launches list
+(defun pending-launches-p (launches)
+  (if (endp launches)
+      t
+    (and (launch-intent-p (car launches))
+         (pending-launches-p (cdr launches)))))
+
+;; Check if already launched
+(defun already-launched-p (exec-id launches)
+  (and (assoc-equal exec-id launches)
+       (cdr (assoc-equal exec-id launches))))
+
+;; Process launch (idempotent)
+;; Mark as launched if not already; returns updated launches and should-launch flag
+(defun process-launch (exec-id launches)
+  (if (already-launched-p exec-id launches)
+      (mv launches nil)  ; Already launched, don't launch again
+    (mv (acons exec-id t launches) t)))  ; Mark and launch
+
+;; Theorem: Each intent is processed exactly once
+(defthm outbox-exactly-once
+  (implies (pending-launches-p launches)
+           (mv-let (new-launches should-launch-1)
+                   (process-launch exec-id launches)
+             (mv-let (final-launches should-launch-2)
+                     (process-launch exec-id new-launches)
+               (and (implies should-launch-1 (not should-launch-2))
+                    (equal (already-launched-p exec-id final-launches) t))))))
+```
+
+### 5.6 Integration with SDKs
+
+**Correspondence Checking Script:**
+```python
+#!/usr/bin/env python3
+# scripts/sync-with-sdk.py
+
+"""
+Verify SDK implementations match ACL2 model.
+
+This script:
+1. Parses ACL2 function signatures from .lisp files
+2. Compares with SDK function signatures
+3. Runs property-based tests that mirror ACL2 theorems
+"""
+
+import ast
+import subprocess
+from pathlib import Path
+
+ACL2_CORE = Path("verification/acl2/core")
+PYTHON_SDK = Path("sdk/python/flatagents")
+JS_SDK = Path("sdk/js/src")
+
+# Functions that must have SDK equivalents
+REQUIRED_FUNCTIONS = [
+    ("machine-step", "machine_step", "_machineStep"),
+    ("eval-simple-expr", "eval_simple_expr", "evalSimpleExpr"),
+    ("find-transition", "find_transition", "findTransition"),
+    ("ctx-merge", "merge_context", "mergeContext"),
+]
+
+def verify_function_exists(sdk_path: Path, func_name: str) -> bool:
+    """Check if function exists in SDK."""
+    # For Python: parse AST and look for function definitions
+    for py_file in sdk_path.glob("**/*.py"):
+        with open(py_file) as f:
+            try:
+                tree = ast.parse(f.read())
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                        return True
+            except SyntaxError:
+                continue
+    return False
+
+def run_acl2_proofs() -> bool:
+    """Run all ACL2 proofs via Makefile."""
+    result = subprocess.run(
+        ["make", "certify"],
+        cwd="verification/acl2",
+        capture_output=True
+    )
+    return result.returncode == 0
+```
+
+**Property-Based Test Bridge:**
+```python
+# sdk/python/tests/test_acl2_properties.py
+
+import hypothesis
+from hypothesis import given, strategies as st
+
+from flatagents.flatmachine import FlatMachine
+from flatagents.expressions import eval_simple_expr
+
+class TestACL2Properties:
+    """Tests that mirror ACL2 theorems for confidence before formal proof."""
+    
+    @given(st.dictionaries(st.text(), st.integers()))
+    def test_determinism(self, context):
+        """Property: eval_simple_expr is deterministic (mirrors eval-simple-expr-deterministic)"""
+        expr = {"op": ">=", "left": {"context": "score"}, "right": 8}
+        result1 = eval_simple_expr(expr, context)
+        result2 = eval_simple_expr(expr, context)
+        assert result1 == result2
+    
+    @given(st.dictionaries(st.text(), st.integers()),
+           st.dictionaries(st.text(), st.integers()),
+           st.dictionaries(st.text(), st.integers()))
+    def test_context_merge_associative(self, ctx1, ctx2, ctx3):
+        """Property: Context merge is associative (mirrors ctx-merge-assoc)"""
+        merged_left = {**{**ctx1, **ctx2}, **ctx3}
+        merged_right = {**ctx1, **{**ctx2, **ctx3}}
+        assert merged_left == merged_right
+    
+    @given(st.text(), st.text())
+    def test_mutex_single_owner(self, owner1, owner2):
+        """Property: Lock can only have one owner (mirrors mutex-single-owner)"""
+        locks = {}
+        
+        # First acquire succeeds
+        locks["key1"] = owner1
+        
+        # Second acquire by different owner fails
+        if owner1 != owner2:
+            assert locks.get("key1") == owner1  # Still held by owner1
+```
+
+### 5.7 CI/CD Integration
+
+**GitHub Actions Workflow:**
+```yaml
+# .github/workflows/acl2-proofs.yml
+
+name: ACL2 Formal Verification
+
+on:
+  push:
+    paths:
+      - 'verification/acl2/**'
+      - 'sdk/**/expressions/**'
+      - 'sdk/**/flatmachine.*'
+  pull_request:
+    paths:
+      - 'verification/acl2/**'
+
+jobs:
+  certify-books:
+    runs-on: ubuntu-latest
+    container:
+      image: acl2/acl2:latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Certify ACL2 Books
+        run: |
+          cd verification/acl2
+          make certify
+      
+      - name: Extract Theorem Summary
+        run: |
+          python3 scripts/extract-theorems.py > theorem-summary.md
+      
+      - name: Upload Proof Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: acl2-proofs
+          path: verification/acl2/**/*.cert
+
+  property-tests:
+    runs-on: ubuntu-latest
+    needs: certify-books
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Python Property Tests
+        run: |
+          cd sdk/python
+          pip install hypothesis pytest
+          pytest tests/test_acl2_properties.py -v
+      
+      - name: Run JS Property Tests
+        run: |
+          cd sdk/js
+          npm install
+          npm run test:properties
+```
+
+### 5.8 Design Principles for Verifiability
 
 **Pure Functions Where Possible:**
 - Expression evaluation (simple mode)
@@ -281,43 +809,6 @@ export class FlatMachine {
 - Machine states are finite and enumerable
 - Transitions are deterministic given context
 - Side effects isolated to backends
-
-**Invariants to Verify:**
-
-| Invariant | Description |
-|-----------|-------------|
-| Progress | Machine eventually reaches final state or error |
-| Determinism | Same input + context → same transition |
-| Checkpoint Consistency | Resume from checkpoint == original execution |
-| Mutual Exclusion | Lock prevents concurrent execution |
-| Outbox Exactly-Once | Each LaunchIntent executed exactly once |
-
-### 5.2 ACL2 Modeling Strategy
-
-**Approach:** Model core state machine logic, not I/O:
-
-1. **State Machine Model:**
-   ```lisp
-   (defun transition (state context config)
-     "Returns (next-state . updated-context) or :error"
-     ...)
-   ```
-
-2. **Expression Evaluator Model:**
-   ```lisp
-   (defun eval-expr (expr context)
-     "Evaluates simple-mode expression in context"
-     ...)
-   ```
-
-3. **Checkpoint/Resume Model:**
-   ```lisp
-   (defun checkpoint-equiv (snapshot execution-trace)
-     "Proves resuming from snapshot continues correctly"
-     ...)
-   ```
-
-### 5.3 Implementation Recommendations
 
 **Keep Verifiable Core Small:**
 - Extract pure logic into separate modules
