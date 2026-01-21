@@ -14,6 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NEW_VERSION=""
 DRY_RUN=true
 UPDATE_PYTHON=false
+UPDATE_JS=false
 UPDATE_EXAMPLES=false
 
 while [[ $# -gt 0 ]]; do
@@ -24,6 +25,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --python)
             UPDATE_PYTHON=true
+            shift
+            ;;
+        --js)
+            UPDATE_JS=true
             shift
             ;;
         --examples)
@@ -57,12 +62,14 @@ if [[ -z "$NEW_VERSION" ]]; then
     echo "Options:"
     echo "  --apply     Actually apply changes (default is dry-run)"
     echo "  --python    Also update Python SDK"
+    echo "  --js        Also update JavaScript SDK (npm)"
     echo "  --examples  Also update shared examples (sdk/examples/*/config/*.yml)"
     echo ""
     echo "What gets updated:"
     echo "  Always:     Root .d.ts specs, README.md, MACHINES.md"
     echo "  --python:   sdk/python/pyproject.toml, sdk/python/flatagents/__init__.py,"
     echo "              sdk/python/examples/**/config/*.yml"
+    echo "  --js:       sdk/js/package.json"
     echo "  --examples: sdk/examples/**/*.yml"
     echo ""
     echo "NOT updated (generated from sources):"
@@ -72,7 +79,7 @@ if [[ -z "$NEW_VERSION" ]]; then
     echo "Examples:"
     echo "  update-spec-versions.sh 0.8.0              # dry-run, specs only"
     echo "  update-spec-versions.sh 0.8.0 --apply      # apply specs only"
-    echo "  update-spec-versions.sh 0.8.0 --python --examples --apply"
+    echo "  update-spec-versions.sh 0.8.0 --python --js --examples --apply"
     exit 1
 fi
 
@@ -87,6 +94,7 @@ fi
 
 echo "Target version: $NEW_VERSION"
 echo "Update Python SDK: $UPDATE_PYTHON"
+echo "Update JavaScript SDK: $UPDATE_JS"
 echo "Update shared examples: $UPDATE_EXAMPLES"
 echo ""
 
@@ -172,7 +180,18 @@ if [[ "$UPDATE_PYTHON" == true ]]; then
 fi
 
 # =============================================================================
-# 4. SHARED EXAMPLES (if --examples)
+# 4. JAVASCRIPT SDK (if --js)
+# =============================================================================
+if [[ "$UPDATE_JS" == true ]]; then
+    echo "JavaScript SDK:"
+
+    # package.json
+    update_file "sdk/js/package.json" "(\"version\":[[:space:]]*\")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
+    echo ""
+fi
+
+# =============================================================================
+# 5. SHARED EXAMPLES (if --examples)
 # =============================================================================
 if [[ "$UPDATE_EXAMPLES" == true ]]; then
     echo "Shared examples (sdk/examples/**/*.yml):"
@@ -196,6 +215,9 @@ else
     echo "  2. Run 'scripts/lint-spec-versions.sh' to verify"
     if [[ "$UPDATE_PYTHON" == true ]]; then
         echo "  3. Run 'sdk/python/release.sh' to build & verify Python SDK"
+    fi
+    if [[ "$UPDATE_JS" == true ]]; then
+        echo "  3. Run 'cd sdk/js && npm publish' to publish to npm"
     fi
     if [[ "$UPDATE_EXAMPLES" == true ]]; then
         echo "  Note: Test shared examples with your SDK of choice"

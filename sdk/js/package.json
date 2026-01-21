@@ -1,5 +1,5 @@
 {
-  "name": "flatagents",
+  "name": "@memgrafter/flatagents",
   "version": "0.7.0",
   "description": "TypeScript SDK for FlatAgents - Declarative LLM orchestration with YAML",
   "main": "dist/index.js",
@@ -22,6 +22,9 @@
   ],
   "author": "memgrafter@gmail.com",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.14",
     "@ai-sdk/cerebras": "^2.0.13",
