@@ -107,7 +107,7 @@ export interface BackendConfig {
     locking?: "none" | "local" | "redis" | "consul";
     results?: "memory" | "redis";
 }
-export const SPEC_VERSION = "0.7.7";
+export const SPEC_VERSION = "0.8.0";
 export interface SDKRuntimeWrapper {
     spec: "flatagents-runtime";
     spec_version: typeof SPEC_VERSION;

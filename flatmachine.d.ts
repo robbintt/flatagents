@@ -256,7 +256,7 @@
  * pending_launches    - Outbox pattern (v0.4.0)
  */
 
-export const SPEC_VERSION = "0.7.7";
+export const SPEC_VERSION = "0.8.0";
 
 export interface MachineWrapper {
   spec: "flatmachine";
