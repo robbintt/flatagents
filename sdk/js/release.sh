@@ -34,6 +34,12 @@ if [ "$DRY_RUN" = true ]; then
 fi
 echo ""
 
+# Copy MACHINES.md and create symlinks for AGENTS.md/CLAUDE.md
+cp "$REPO_ROOT/MACHINES.md" "$SDK_DIR/MACHINES.md"
+ln -sf MACHINES.md "$SDK_DIR/AGENTS.md"
+ln -sf MACHINES.md "$SDK_DIR/CLAUDE.md"
+echo "✓ MACHINES.md synced from root (with AGENTS.md, CLAUDE.md symlinks)"
+
 # Extract version from package.json
 PACKAGE_VERSION=$(node -p "require('./package.json').version")
 

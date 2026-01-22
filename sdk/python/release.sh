@@ -122,6 +122,8 @@ cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$REPO_ROOT/profile
 # Copy root README and MACHINES.md for PyPI (hatchling requires readme in package dir)
 cp "$REPO_ROOT/README.md" "$SDK_DIR/README.md"
 cp "$REPO_ROOT/MACHINES.md" "$SDK_DIR/MACHINES.md"
+ln -sf MACHINES.md "$SDK_DIR/AGENTS.md"
+ln -sf MACHINES.md "$SDK_DIR/CLAUDE.md"
 
 # Validate README copy succeeded
 if ! diff -q "$REPO_ROOT/README.md" "$SDK_DIR/README.md" > /dev/null 2>&1; then
@@ -135,7 +137,7 @@ if ! diff -q "$REPO_ROOT/MACHINES.md" "$SDK_DIR/MACHINES.md" > /dev/null 2>&1; t
     echo "RELEASE ABORTED: MACHINES.md does not match root. Ensure copy step is present."
     exit 1
 fi
-echo "✓ MACHINES.md synced from root"
+echo "✓ MACHINES.md synced from root (with AGENTS.md, CLAUDE.md symlinks)"
 
 # Extract versions from root TypeScript specs
 echo "Extracting spec versions from TypeScript files..."
