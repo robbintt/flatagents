@@ -9,7 +9,7 @@ data:
     # Fast and cheap - good for development/iteration
     fast-cheap:
       provider: cerebras
-      name: zai-glm-4.6
+      name: zai-glm-4.7
       temperature: 1.0
       max_tokens: 2048
 

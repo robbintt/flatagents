@@ -10,12 +10,13 @@
     "start": "node dist/helloworld/main.js"
   },
   "dependencies": {
-    "flatagents": "file:../../../js"
+    "@memgrafter/flatagents": "^0.8.0",
+    "yaml": "^2.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.7.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   },
   "keywords": [
     "flatagents",

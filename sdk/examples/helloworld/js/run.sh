@@ -56,10 +56,15 @@ fi
 # 1. Install Dependencies
 echo "📦 Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
-    echo "  - Building flatagents from local source..."
+    echo "  - Using local flatagents SDK..."
     cd "$JS_SDK_PATH"
     npm run build
     cd "$SCRIPT_DIR"
+    # Swap to local dependency
+    npm pkg set dependencies.@memgrafter/flatagents="file:../../../js"
+else
+    # Ensure we're using the npm package
+    npm pkg set dependencies.@memgrafter/flatagents="^0.8.0"
 fi
 
 echo "  - Installing helloworld demo package..."
