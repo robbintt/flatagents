@@ -178,9 +178,18 @@ if (args[0] === "--extract-version" && args[1]) {
   }
 }
 
-// Normal asset generation
-const targetDir = args[0] || path.join(REPO_ROOT, "sdk", "python", "flatagents", "assets");
-console.log(`Generating spec assets to: ${targetDir}\n`);
-generateAssets(targetDir);
-console.log("\nDone!");
+// Normal asset generation - default targets
+const targetDirs = args.length > 0 ? args : [
+  path.join(REPO_ROOT, "assets"),
+  path.join(REPO_ROOT, "sdk", "python", "flatagents", "assets"),
+  path.join(REPO_ROOT, "sdk", "js", "schemas"),
+];
+
+for (const targetDir of targetDirs) {
+  console.log(`Generating spec assets to: ${targetDir}\n`);
+  generateAssets(targetDir);
+  console.log("");
+}
+
+console.log("Done!");
 

@@ -51,11 +51,13 @@ fi
 FLATAGENT_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagent.d.ts")
 FLATMACHINE_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatmachine.d.ts")
 PROFILES_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/profiles.d.ts")
+RUNTIME_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagents-runtime.d.ts")
 
 echo "TypeScript spec versions:"
-echo "  flatagent.d.ts:   $FLATAGENT_VERSION"
-echo "  flatmachine.d.ts: $FLATMACHINE_VERSION"
-echo "  profiles.d.ts:    $PROFILES_VERSION"
+echo "  flatagent.d.ts:          $FLATAGENT_VERSION"
+echo "  flatmachine.d.ts:        $FLATMACHINE_VERSION"
+echo "  profiles.d.ts:           $PROFILES_VERSION"
+echo "  flatagents-runtime.d.ts: $RUNTIME_VERSION"
 echo ""
 
 # Validate SDK version matches spec versions
@@ -85,10 +87,48 @@ else
     echo "  ✓ SDK version matches profiles.d.ts ($PROFILES_VERSION)"
 fi
 
+if [[ "$PACKAGE_VERSION" != "$RUNTIME_VERSION" ]]; then
+    echo "  ✗ SDK version ($PACKAGE_VERSION) != flatagents-runtime.d.ts ($RUNTIME_VERSION)"
+    FAILED=1
+else
+    echo "  ✓ SDK version matches flatagents-runtime.d.ts ($RUNTIME_VERSION)"
+fi
+
 if [[ "$FAILED" -eq 1 ]]; then
     echo ""
     echo "RELEASE ABORTED: SDK version mismatch with TypeScript specs."
     echo "Run: scripts/update-spec-versions.sh <version> --js --apply"
+    exit 1
+fi
+
+echo ""
+
+# Validate schemas/ folder versions match package version
+echo "Checking schemas/ folder versions..."
+SCHEMA_SPECS=("flatagent" "flatmachine" "profiles" "flatagents-runtime")
+SCHEMA_FAILED=0
+
+for spec in "${SCHEMA_SPECS[@]}"; do
+    SCHEMA_FILE="schemas/${spec}.d.ts"
+    if [[ ! -f "$SCHEMA_FILE" ]]; then
+        echo "  ✗ $SCHEMA_FILE not found"
+        SCHEMA_FAILED=1
+        continue
+    fi
+    
+    SCHEMA_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$SDK_DIR/$SCHEMA_FILE")
+    if [[ "$SCHEMA_VERSION" != "$PACKAGE_VERSION" ]]; then
+        echo "  ✗ $SCHEMA_FILE version ($SCHEMA_VERSION) != package.json ($PACKAGE_VERSION)"
+        SCHEMA_FAILED=1
+    else
+        echo "  ✓ $SCHEMA_FILE ($SCHEMA_VERSION)"
+    fi
+done
+
+if [[ "$SCHEMA_FAILED" -eq 1 ]]; then
+    echo ""
+    echo "RELEASE ABORTED: schemas/ folder out of sync."
+    echo "Run: npx tsx scripts/generate-spec-assets.ts"
     exit 1
 fi
 

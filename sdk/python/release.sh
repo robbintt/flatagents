@@ -147,11 +147,13 @@ fi
 FLATAGENT_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagent.d.ts")
 FLATMACHINE_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatmachine.d.ts")
 PROFILES_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/profiles.d.ts")
+RUNTIME_VERSION=$(cd "$REPO_ROOT/scripts" && npx tsx generate-spec-assets.ts --extract-version "$REPO_ROOT/flatagents-runtime.d.ts")
 
 echo "TypeScript spec versions:"
-echo "  flatagent.d.ts:   $FLATAGENT_VERSION"
-echo "  flatmachine.d.ts: $FLATMACHINE_VERSION"
-echo "  profiles.d.ts:    $PROFILES_VERSION"
+echo "  flatagent.d.ts:          $FLATAGENT_VERSION"
+echo "  flatmachine.d.ts:        $FLATMACHINE_VERSION"
+echo "  profiles.d.ts:           $PROFILES_VERSION"
+echo "  flatagents-runtime.d.ts: $RUNTIME_VERSION"
 echo ""
 
 # Validate SDK __version__ matches spec versions (all specs unified to same version)
@@ -181,6 +183,13 @@ else
     echo "  ✓ SDK version matches profiles.d.ts ($PROFILES_VERSION)"
 fi
 
+if [[ "$PYPROJECT_VERSION" != "$RUNTIME_VERSION" ]]; then
+    echo "  ✗ SDK version ($PYPROJECT_VERSION) != flatagents-runtime.d.ts ($RUNTIME_VERSION)"
+    FAILED=1
+else
+    echo "  ✓ SDK version matches flatagents-runtime.d.ts ($RUNTIME_VERSION)"
+fi
+
 if [[ "$FAILED" -eq 1 ]]; then
     echo ""
     echo "RELEASE ABORTED: SDK version mismatch with TypeScript specs."
@@ -199,7 +208,7 @@ echo ""
 echo "Verifying spec assets..."
 FAILED=0
 
-for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts; do
+for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts flatagents-runtime.d.ts; do
     if [ ! -f "$ASSETS_DIR/$file" ]; then
         echo "  ✗ $file (missing)"
         FAILED=1
@@ -211,8 +220,8 @@ for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts; do
     fi
 done
 
-for file in flatagent.slim.d.ts flatmachine.slim.d.ts profiles.slim.d.ts \
-            flatagent.schema.json flatmachine.schema.json profiles.schema.json; do
+for file in flatagent.slim.d.ts flatmachine.slim.d.ts profiles.slim.d.ts flatagents-runtime.slim.d.ts \
+            flatagent.schema.json flatmachine.schema.json profiles.schema.json flatagents-runtime.schema.json; do
     if [ ! -f "$ASSETS_DIR/$file" ]; then
         echo "  ✗ $file (missing)"
         FAILED=1

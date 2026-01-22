@@ -1,0 +1,596 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MachineWrapper",
+  "definitions": {
+    "MachineWrapper": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "string",
+          "const": "flatmachine"
+        },
+        "spec_version": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/MachineData"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "spec",
+        "spec_version",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "MachineData": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "expression_engine": {
+          "type": "string",
+          "enum": [
+            "simple",
+            "cel"
+          ]
+        },
+        "context": {
+          "type": "object"
+        },
+        "agents": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/definitions/AgentWrapper"
+              }
+            ]
+          }
+        },
+        "machines": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/definitions/MachineWrapper"
+              }
+            ]
+          }
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/StateDefinition"
+          }
+        },
+        "settings": {
+          "$ref": "#/definitions/MachineSettings"
+        },
+        "persistence": {
+          "$ref": "#/definitions/PersistenceConfig"
+        },
+        "hooks": {
+          "$ref": "#/definitions/HooksConfig"
+        }
+      },
+      "required": [
+        "states"
+      ],
+      "additionalProperties": false
+    },
+    "AgentWrapper": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "string",
+          "const": "flatagent"
+        },
+        "spec_version": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/definitions/AgentData"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "spec",
+        "spec_version",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "AgentData": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelConfig"
+            },
+            {
+              "$ref": "#/definitions/ProfiledModelConfig"
+            }
+          ]
+        },
+        "system": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "instruction_suffix": {
+          "type": "string"
+        },
+        "output": {
+          "$ref": "#/definitions/OutputSchema"
+        },
+        "mcp": {
+          "$ref": "#/definitions/MCPConfig"
+        }
+      },
+      "required": [
+        "model",
+        "system",
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "ModelConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "type": "number"
+        },
+        "presence_penalty": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProfiledModelConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_tokens": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "type": "number"
+        },
+        "presence_penalty": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "additionalProperties": false
+    },
+    "OutputSchema": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/OutputFieldDef"
+      }
+    },
+    "OutputFieldDef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "str",
+            "int",
+            "float",
+            "bool",
+            "json",
+            "list",
+            "object"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "items": {
+          "$ref": "#/definitions/OutputFieldDef"
+        },
+        "properties": {
+          "$ref": "#/definitions/OutputSchema"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "MCPConfig": {
+      "type": "object",
+      "properties": {
+        "servers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/MCPServerDef"
+          }
+        },
+        "tool_filter": {
+          "$ref": "#/definitions/ToolFilter"
+        },
+        "tool_prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "servers",
+        "tool_prompt"
+      ],
+      "additionalProperties": false
+    },
+    "MCPServerDef": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "server_url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "timeout": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolFilter": {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "final"
+          ]
+        },
+        "agent": {
+          "type": "string"
+        },
+        "machine": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/MachineInput"
+              }
+            }
+          ]
+        },
+        "action": {
+          "type": "string"
+        },
+        "execution": {
+          "$ref": "#/definitions/ExecutionConfig"
+        },
+        "on_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "input": {
+          "type": "object"
+        },
+        "output_to_context": {
+          "type": "object"
+        },
+        "output": {
+          "type": "object"
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Transition"
+          }
+        },
+        "tool_loop": {
+          "type": "boolean"
+        },
+        "sampling": {
+          "type": "string",
+          "enum": [
+            "single",
+            "multi"
+          ]
+        },
+        "foreach": {
+          "type": "string"
+        },
+        "as": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "settled",
+            "any"
+          ]
+        },
+        "timeout": {
+          "type": "number"
+        },
+        "launch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "launch_input": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineInput": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionConfig": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "default",
+            "retry",
+            "parallel",
+            "mdap_voting"
+          ]
+        },
+        "backoffs": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "jitter": {
+          "type": "number"
+        },
+        "n_samples": {
+          "type": "number"
+        },
+        "k_margin": {
+          "type": "number"
+        },
+        "max_candidates": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "Transition": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSettings": {
+      "type": "object",
+      "properties": {
+        "max_steps": {
+          "type": "number"
+        },
+        "parallel_fallback": {
+          "type": "string",
+          "enum": [
+            "sequential",
+            "error"
+          ]
+        }
+      }
+    },
+    "PersistenceConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string"
+        },
+        "checkpoint_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "backend"
+      ]
+    },
+    "HooksConfig": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "module": {
+          "type": "string"
+        },
+        "class": {
+          "type": "string"
+        },
+        "args": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "additionalProperties": false,
+      "description": "Configuration for loading hooks from file or module.\n\nFile-based (preferred for self-contained skills):   hooks:     file: \"./hooks.py\"     class: \"MyHooks\"     args:       working_dir: \".\"\n\nModule-based (for installed packages):   hooks:     module: \"mypackage.hooks\"     class: \"MyHooks\"     args:       api_key: \"{{ input.api_key }}\"\n\nFields:   file   - Path to Python file containing hooks class (relative to machine.yml)   module - Python module path to import   class  - Class name to instantiate (required)   args   - Arguments to pass to hooks constructor"
+    }
+  }
+}
