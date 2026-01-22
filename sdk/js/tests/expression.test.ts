@@ -175,14 +175,12 @@ describe('Expression Evaluation', () => {
   });
 
   describe('Array Access', () => {
-    it('should access array elements through dot notation in our simplified parser', () => {
-      // Our current parser doesn't support bracket notation, so this tests what it can do
+    it('should access array elements through dot notation', () => {
       const result = evaluate('context.array.0', {
         ...baseContext,
         context: { array: ['a', 'b', 'c'] }
       });
-      // This would fail with current implementation - test shows limitation
-      expect(result).toBeUndefined(); // Expected with current parser
+      expect(result).toBe('a');
     });
   });
 
@@ -206,9 +204,8 @@ describe('Expression Evaluation', () => {
         },
         {
           expr: 'context.items.length > 0 and context.status != "processed"',
-          // Our parser can't access .length, so this would be undefined
           context: { items: [1, 2, 3], status: 'pending' },
-          expected: false // Expected with current parser limitations
+          expected: true
         }
       ];
 
@@ -325,19 +322,20 @@ describe('Expression Evaluation', () => {
       expect(result1).toBe(true);
     });
 
-    it('should handle boolean conversion', () => {
-      const testCases = [
-        { expr: 'context.zero', context: { zero: 0 }, expected: false },
-        { expr: 'context.empty', context: { empty: '' }, expected: false },
-        { expr: 'context.nonzero', context: { nonzero: 42 }, expected: true },
-        { expr: 'context.nonempty', context: { nonempty: 'hello' }, expected: true },
-        { expr: 'context.truethy', context: { truethy: true }, expected: true }
-      ];
+    it('should return actual values for property access', () => {
+      // evaluate returns actual values; use JavaScript truthy/falsy in conditions
+      expect(evaluate('context.zero', { ...baseContext, context: { zero: 0 } })).toBe(0);
+      expect(evaluate('context.empty', { ...baseContext, context: { empty: '' } })).toBe('');
+      expect(evaluate('context.nonzero', { ...baseContext, context: { nonzero: 42 } })).toBe(42);
+      expect(evaluate('context.nonempty', { ...baseContext, context: { nonempty: 'hello' } })).toBe('hello');
+      expect(evaluate('context.truthy', { ...baseContext, context: { truthy: true } })).toBe(true);
+    });
 
-      for (const { expr, context, expected } of testCases) {
-        const result = evaluate(expr, { ...baseContext, context });
-        expect(result).toBe(expected);
-      }
+    it('should work with truthy/falsy values in boolean expressions', () => {
+      // When used in boolean context (and/or/not), truthy/falsy applies
+      expect(evaluate('context.zero or context.fallback', { ...baseContext, context: { zero: 0, fallback: 'default' } })).toBe('default');
+      expect(evaluate('context.value and context.other', { ...baseContext, context: { value: 42, other: 'yes' } })).toBe('yes');
+      expect(evaluate('not context.zero', { ...baseContext, context: { zero: 0 } })).toBe(true);
     });
   });
 
@@ -470,12 +468,15 @@ describe('Expression Parser Validation', () => {
 
   it('should handle partial context gracefully', () => {
     const partialContext = { context: {}, input: {}, output: {} };
-    
+
     // Accessing missing property should return undefined
     const result = evaluate('context.missing', partialContext);
     expect(result).toBeUndefined();
-    
-    // Comparison with undefined should work
-    expect(evaluate('context.missing == null', partialContext)).toBe(true);
+
+    // Strict equality: undefined !== null
+    expect(evaluate('context.missing == null', partialContext)).toBe(false);
+
+    // Truthy/falsy: undefined is falsy
+    expect(evaluate('not context.missing', partialContext)).toBe(true);
   });
 });
