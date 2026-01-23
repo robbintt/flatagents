@@ -158,8 +158,14 @@ class ProfileManager:
             profile_cfg = self.get_profile(agent_model_config)
             if profile_cfg:
                 result.update(profile_cfg)
+            elif result:
+                # Profile not found but we have a default - warn and continue
+                logger.warning(
+                    f"Model profile '{agent_model_config}' not found, "
+                    f"using default profile '{self._default_profile}'"
+                )
             else:
-                raise ValueError(f"Model profile '{agent_model_config}' not found")
+                raise ValueError(f"Model profile '{agent_model_config}' not found and no default configured")
 
         elif isinstance(agent_model_config, dict):
             # Check for profile reference in dict
@@ -168,8 +174,14 @@ class ProfileManager:
                 profile_cfg = self.get_profile(profile_name)
                 if profile_cfg:
                     result.update(profile_cfg)
+                elif result:
+                    # Profile not found but we have a default - warn and continue
+                    logger.warning(
+                        f"Model profile '{profile_name}' not found, "
+                        f"using default profile '{self._default_profile}'"
+                    )
                 else:
-                    raise ValueError(f"Model profile '{profile_name}' not found")
+                    raise ValueError(f"Model profile '{profile_name}' not found and no default configured")
 
             # Merge inline overrides (excluding 'profile' key)
             inline_overrides = {
