@@ -263,7 +263,7 @@ class MDAPVotingExecution(ExecutionType):
         self,
         k_margin: int = 3,
         max_candidates: int = 10,
-        max_response_tokens: int = 2048
+        max_response_tokens: Optional[int] = None
     ):
         self.k_margin = k_margin
         self.max_candidates = max_candidates
@@ -279,7 +279,7 @@ class MDAPVotingExecution(ExecutionType):
         return cls(
             k_margin=config.get("k_margin", 3),
             max_candidates=config.get("max_candidates", 10),
-            max_response_tokens=config.get("max_response_tokens", 2048)
+            max_response_tokens=config.get("max_response_tokens")
         )
     
     def _configure_from_agent(self, agent: "FlatAgent"):
@@ -354,9 +354,11 @@ class MDAPVotingExecution(ExecutionType):
         if not self._validate_parsed(parsed):
             return "validation_failed"
 
-        estimated_tokens = len(content) // 4
-        if estimated_tokens > self.max_response_tokens:
-            return "length_exceeded"
+        # Only check response length if max_response_tokens is set
+        if self.max_response_tokens is not None:
+            estimated_tokens = len(content) // 4
+            if estimated_tokens > self.max_response_tokens:
+                return "length_exceeded"
 
         return None
     

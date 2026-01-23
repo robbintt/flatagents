@@ -218,8 +218,9 @@ class FlatAgent:
             "model": model,
             "messages": params["messages"],
             "temperature": params.get("temperature", 0.7),
-            "max_tokens": params.get("max_tokens", 2048),
         }
+        if "max_tokens" in params:
+            call_params["max_tokens"] = params["max_tokens"]
         if "tools" in params:
             call_params["tools"] = params["tools"]
 
@@ -240,8 +241,9 @@ class FlatAgent:
 
         kwargs = {
             "temperature": params.get("temperature", 0.7),
-            "max_tokens": params.get("max_tokens", 2048),
         }
+        if "max_tokens" in params:
+            kwargs["max_tokens"] = params["max_tokens"]
         if "tools" in params:
             kwargs["tools"] = params["tools"]
 
@@ -317,7 +319,7 @@ class FlatAgent:
         # Set model attributes (with kwargs override)
         self.model = kwargs.get('model', full_model_name)
         self.temperature = kwargs.get('temperature', model_config.get('temperature', 0.7))
-        self.max_tokens = kwargs.get('max_tokens', model_config.get('max_tokens', 2048))
+        self.max_tokens = kwargs.get('max_tokens', model_config.get('max_tokens'))
 
         # Extended model config fields
         self.top_p = kwargs.get('top_p', model_config.get('top_p'))
@@ -673,8 +675,10 @@ class FlatAgent:
             "model": self.model,
             "messages": all_messages,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
         }
+        # Only include max_tokens if explicitly provided
+        if self.max_tokens is not None:
+            params["max_tokens"] = self.max_tokens
 
         # Add extended model parameters if set
         if self.top_p is not None:

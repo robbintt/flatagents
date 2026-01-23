@@ -87,7 +87,7 @@ class LiteLLMBackend:
         self,
         model: str,
         temperature: float = 0.7,
-        max_tokens: int = 2048,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
@@ -99,11 +99,12 @@ class LiteLLMBackend:
         self.model = model
         self.llm_kwargs = {
             "temperature": temperature,
-            "max_tokens": max_tokens,
             "top_p": top_p,
             "frequency_penalty": frequency_penalty,
             "presence_penalty": presence_penalty,
         }
+        if max_tokens is not None:
+            self.llm_kwargs["max_tokens"] = max_tokens
         self.retry_delays = retry_delays or [1, 2, 4, 8]
         self.total_cost = 0.0
         self.total_api_calls = 0
@@ -178,7 +179,7 @@ class AISuiteBackend:
         self,
         model: str,
         temperature: float = 0.7,
-        max_tokens: int = 2048,
+        max_tokens: Optional[int] = None,
         top_p: float = 1.0,
         retry_delays: Optional[List[float]] = None,
     ):
@@ -189,9 +190,10 @@ class AISuiteBackend:
         self.model = model.replace("/", ":", 1) if "/" in model else model
         self.llm_kwargs = {
             "temperature": temperature,
-            "max_tokens": max_tokens,
             "top_p": top_p,
         }
+        if max_tokens is not None:
+            self.llm_kwargs["max_tokens"] = max_tokens
         self.retry_delays = retry_delays or [1, 2, 4, 8]
         self.total_cost = 0.0
         self.total_api_calls = 0
@@ -665,7 +667,7 @@ class FlatAgent(ABC):
         # Store config values for backend creation
         self.model = kwargs.get('model', full_model_name)
         self.temperature = get_value('temperature', 0.7)
-        self.max_tokens = get_value('max_tokens', 2048)
+        self.max_tokens = get_value('max_tokens', None)
         self.top_p = get_value('top_p', 1.0)
         self.frequency_penalty = get_value('frequency_penalty', 0.0)
         self.presence_penalty = get_value('presence_penalty', 0.0)
