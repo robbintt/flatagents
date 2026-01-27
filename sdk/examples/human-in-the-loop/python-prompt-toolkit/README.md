@@ -1,0 +1,127 @@
+# Human-in-the-Loop Example (prompt_toolkit)
+
+A simple example demonstrating human-in-the-loop workflows with FlatMachines, using [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/) for enhanced terminal input.
+
+## Why prompt_toolkit?
+
+This example uses `prompt_toolkit` instead of Python's built-in `input()` for several advantages:
+
+- **Multiline support**: Enter complex feedback spanning multiple lines
+- **Control code handling**: Proper support for Ctrl+C, arrow keys, and other control sequences
+- **Editing capabilities**: Full line editing with history support
+- **Async integration**: Works seamlessly with async code via `prompt_async()`
+- **Cross-platform**: Works consistently across Windows, macOS, and Linux
+
+## Overview
+
+This example shows how to:
+1. Pause machine execution for human input
+2. Incorporate human feedback into agent revisions
+3. Allow humans to approve or request changes
+
+## Flow
+
+```
+┌─────────────────┐
+│      start      │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  generate_draft │◄──────────┐
+└────────┬────────┘           │
+         │                    │
+         ▼                    │ feedback
+┌─────────────────┐           │
+│ await_human_    │───────────┘
+│    review       │
+└────────┬────────┘
+         │ approved
+         ▼
+┌─────────────────┐
+│      done       │
+└─────────────────┘
+```
+
+## Usage
+
+```bash
+cd sdk/examples/human-in-the-loop/python-prompt-toolkit
+
+# Run with default topic
+./run.sh
+
+# Run with a custom topic
+./run.sh --topic "Benefits of remote work"
+
+# With custom max revisions
+./run.sh --topic "AI in healthcare" --max-revisions 5
+
+# Use local SDK development version
+./run.sh --local --topic "My topic"
+```
+
+## Key Concepts
+
+### Hook Actions
+
+The `await_human_review` state uses a hook action:
+
+```yaml
+await_human_review:
+  action: human_review  # Triggers HumanInLoopHooks.on_action()
+  transitions:
+    - condition: "context.human_approved == true"
+      to: done
+```
+
+### The Async Hook with prompt_toolkit
+
+```python
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.styles import Style
+
+class HumanInLoopHooks(MachineHooks):
+    def __init__(self):
+        # Reusable session for history across revisions
+        self.session = PromptSession(style=STYLE)
+    
+    async def on_action(self, action_name: str, context: Dict) -> Dict:
+        if action_name == "human_review":
+            # Display draft
+            print(context.get("draft", ""))
+            
+            # Use prompt_async for proper async integration
+            response = await self.session.prompt_async(
+                HTML('<prompt>Your response: </prompt>'),
+                multiline=True,
+            )
+            
+            # Process response
+            if response.strip().lower() in ("y", "yes", ""):
+                context["human_approved"] = True
+            else:
+                context["human_approved"] = False
+                context["human_feedback"] = response.strip()
+        return context
+```
+
+**Note**: Use `prompt_async()` instead of `prompt()` when inside an async context (like FlatMachine hooks). The synchronous `prompt()` function uses `asyncio.run()` internally, which will fail if an event loop is already running.
+
+### Input Handling
+
+- **Multiline**: Type your feedback across multiple lines
+- **Submit**: Press Meta+Enter (Alt+Enter) or Esc followed by Enter to submit
+- **Cancel**: Ctrl+C gracefully cancels and auto-approves
+- **Edit**: Use arrow keys to navigate, standard editing shortcuts work
+
+## Extending This Example
+
+- **Custom styling**: Modify the `STYLE` dict to change prompt appearance
+- **Autocompletion**: Add completers for common feedback patterns
+- **History**: The `PromptSession` already provides history within a session
+- **Persistent history**: Pass `history=FileHistory('.history')` to PromptSession
+- **Syntax highlighting**: Highlight markdown or code in drafts
+- **Web UI**: Replace prompt_toolkit with a web endpoint
+- **Async Approval**: Store pending reviews in a database
