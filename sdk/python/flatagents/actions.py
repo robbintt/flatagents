@@ -39,7 +39,11 @@ class HookAction(Action):
         context: Dict[str, Any],
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        return self.hooks.on_action(action_name, context)
+        import asyncio
+        result = self.hooks.on_action(action_name, context)
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
 
 # -------------------------------------------------------------------------
 # Machine Invokers (Graph Execution)
