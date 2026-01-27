@@ -1,6 +1,6 @@
 # Human-in-the-Loop Example (prompt_toolkit)
 
-A simple example demonstrating human-in-the-loop workflows with flatmachines, using [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/) for enhanced terminal input.
+A simple example demonstrating human-in-the-loop workflows with FlatMachines, using [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/) for enhanced terminal input.
 
 ## Why prompt_toolkit?
 
@@ -9,7 +9,7 @@ This example uses `prompt_toolkit` instead of Python's built-in `input()` for se
 - **Multiline support**: Enter complex feedback spanning multiple lines
 - **Control code handling**: Proper support for Ctrl+C, arrow keys, and other control sequences
 - **Editing capabilities**: Full line editing with history support
-- **Future-proof**: prompt_toolkit powers IPython and has been actively maintained for years
+- **Async integration**: Works seamlessly with async code via `prompt_async()`
 - **Cross-platform**: Works consistently across Windows, macOS, and Linux
 
 ## Overview
@@ -75,33 +75,39 @@ await_human_review:
       to: done
 ```
 
-### The Hook with prompt_toolkit
+### The Async Hook with prompt_toolkit
 
 ```python
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.styles import Style
 
 class HumanInLoopHooks(MachineHooks):
-    def on_action(self, action_name: str, context: Dict) -> Dict:
+    def __init__(self):
+        # Reusable session for history across revisions
+        self.session = PromptSession(style=STYLE)
+    
+    async def on_action(self, action_name: str, context: Dict) -> Dict:
         if action_name == "human_review":
             # Display draft
             print(context.get("draft", ""))
             
-            # Get input with prompt_toolkit (multiline enabled)
-            response = prompt(
+            # Use prompt_async for proper async integration
+            response = await self.session.prompt_async(
                 HTML('<prompt>Your response: </prompt>'),
                 multiline=True,
-            ).strip()
+            )
             
             # Process response
-            if response.lower() in ("y", "yes", ""):
+            if response.strip().lower() in ("y", "yes", ""):
                 context["human_approved"] = True
             else:
                 context["human_approved"] = False
-                context["human_feedback"] = response
+                context["human_feedback"] = response.strip()
         return context
 ```
+
+**Note**: Use `prompt_async()` instead of `prompt()` when inside an async context (like FlatMachine hooks). The synchronous `prompt()` function uses `asyncio.run()` internally, which will fail if an event loop is already running.
 
 ### Input Handling
 
@@ -114,7 +120,8 @@ class HumanInLoopHooks(MachineHooks):
 
 - **Custom styling**: Modify the `STYLE` dict to change prompt appearance
 - **Autocompletion**: Add completers for common feedback patterns
-- **History**: Add persistent history across sessions
+- **History**: The `PromptSession` already provides history within a session
+- **Persistent history**: Pass `history=FileHistory('.history')` to PromptSession
 - **Syntax highlighting**: Highlight markdown or code in drafts
 - **Web UI**: Replace prompt_toolkit with a web endpoint
 - **Async Approval**: Store pending reviews in a database

@@ -8,7 +8,7 @@ for multiline input and control code support.
 
 from typing import Any, Dict
 
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.styles import Style
 
@@ -31,13 +31,17 @@ class HumanInLoopHooks(MachineHooks):
     control code handling, and a better terminal experience.
     """
     
-    def on_action(self, action_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def __init__(self):
+        # Create a reusable session for history support across revisions
+        self.session = PromptSession(style=STYLE)
+    
+    async def on_action(self, action_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle custom actions."""
         if action_name == "human_review":
-            return self._human_review(context)
+            return await self._human_review(context)
         return context
     
-    def _human_review(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _human_review(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Pause for human review of the current draft.
         
@@ -63,11 +67,12 @@ class HumanInLoopHooks(MachineHooks):
         print()
         
         try:
-            response = prompt(
+            # Use prompt_async for proper async event loop integration
+            response = await self.session.prompt_async(
                 HTML('<prompt>Your response: </prompt>'),
-                style=STYLE,
                 multiline=True,  # Enable multiline input; submit with Meta+Enter or Esc+Enter
-            ).strip()
+            )
+            response = response.strip()
         except (KeyboardInterrupt, EOFError):
             # Handle Ctrl+C or Ctrl+D gracefully
             print("\n✗ Review cancelled. Approving by default.")
@@ -82,7 +87,7 @@ class HumanInLoopHooks(MachineHooks):
         else:
             context["human_approved"] = False
             context["human_feedback"] = response
-            print(f"→ Feedback recorded. Requesting revision...")
+            print("→ Feedback recorded. Requesting revision...")
         
         print("=" * 60 + "\n")
         return context
