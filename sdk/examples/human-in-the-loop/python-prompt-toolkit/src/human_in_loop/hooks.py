@@ -59,14 +59,14 @@ class HumanInLoopHooks(MachineHooks):
         print(context.get("draft", "(No draft yet)"))
         print("-" * 40)
         print("\nEnter 'y' or 'yes' to approve, or provide multiline feedback.")
-        print("(Press Enter to submit single line, or Meta+Enter / Esc+Enter for multiline)")
+        print("(Press Meta+Enter or Esc+Enter to submit)")
         print()
         
         try:
             response = prompt(
                 HTML('<prompt>Your response: </prompt>'),
                 style=STYLE,
-                multiline=False,  # Single line by default, user can use Meta+Enter for multiline
+                multiline=True,  # Enable multiline input; submit with Meta+Enter or Esc+Enter
             ).strip()
         except (KeyboardInterrupt, EOFError):
             # Handle Ctrl+C or Ctrl+D gracefully

@@ -88,10 +88,10 @@ class HumanInLoopHooks(MachineHooks):
             # Display draft
             print(context.get("draft", ""))
             
-            # Get input with prompt_toolkit
+            # Get input with prompt_toolkit (multiline enabled)
             response = prompt(
                 HTML('<prompt>Your response: </prompt>'),
-                multiline=False,
+                multiline=True,
             ).strip()
             
             # Process response
@@ -105,8 +105,8 @@ class HumanInLoopHooks(MachineHooks):
 
 ### Input Handling
 
-- **Single line**: Just type and press Enter
-- **Multiline**: Use Meta+Enter (Alt+Enter) or Esc followed by Enter to submit
+- **Multiline**: Type your feedback across multiple lines
+- **Submit**: Press Meta+Enter (Alt+Enter) or Esc followed by Enter to submit
 - **Cancel**: Ctrl+C gracefully cancels and auto-approves
 - **Edit**: Use arrow keys to navigate, standard editing shortcuts work
 
