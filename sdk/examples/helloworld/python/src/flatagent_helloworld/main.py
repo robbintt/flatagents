@@ -1,12 +1,40 @@
 import asyncio
 import os
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
 
 # Configure logging for the entire application
 setup_logging(level='INFO')
 logger = get_logger(__name__)
+
+
+class HelloWorldHooks(LoggingHooks):
+    """Hooks for the HelloWorld demo with append_char action."""
+
+    def on_state_exit(
+        self,
+        state_name: str,
+        context: Dict[str, Any],
+        output: Optional[Dict[str, Any]]
+    ):
+        output = super().on_state_exit(state_name, context, output)
+        if state_name == "build_char" and output:
+            next_char = output.get("next_char")
+            if next_char is None:
+                next_char = output.get("content")
+            if next_char is not None:
+                current = context.get("current", "")
+                expected = context.get("expected_char")
+                status = "match" if expected is not None and next_char == expected else "mismatch"
+                print(f"{current}{next_char} ({status})")
+        return output
+
+    def on_action(self, action_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        if action_name == "append_char":
+            context["current"] = context["current"] + context["last_output"]
+        return context
 
 
 async def run():
@@ -22,7 +50,7 @@ async def run():
     config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'machine.yml'
     machine = FlatMachine(
         config_file=str(config_path),
-        hooks=LoggingHooks()
+        hooks=HelloWorldHooks()
     )
 
     logger.info(f"Machine: {machine.machine_name}")
@@ -33,7 +61,8 @@ async def run():
     logger.info("Building character by character...")
 
     # Execute the machine - all loop logic is in the config
-    result = await machine.execute(input={"target": target})
+    # Limit to 20 agent calls (14 chars + buffer) to prevent runaway loops
+    result = await machine.execute(input={"target": target}, max_agent_calls=20)
 
     logger.info("--- Execution Complete ---")
     logger.info(f"Final: '{result.get('result', '')}'")
@@ -55,4 +84,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

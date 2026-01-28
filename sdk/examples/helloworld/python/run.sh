@@ -67,10 +67,10 @@ fi
 echo "📦 Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
     echo "  - Installing flatagents from local source..."
-    uv pip install --python "$VENV_PATH/bin/python" -e "$PYTHON_SDK_PATH[litellm]"
+    uv pip install --python "$VENV_PATH/bin/python" -e "$PYTHON_SDK_PATH[litellm,metrics]"
 else
     echo "  - Installing flatagents from PyPI..."
-    uv pip install --python "$VENV_PATH/bin/python" "flatagents[litellm]"
+    uv pip install --python "$VENV_PATH/bin/python" "flatagents[litellm,metrics]"
 fi
 
 echo "  - Installing helloworld demo package..."

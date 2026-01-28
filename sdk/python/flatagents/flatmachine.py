@@ -1079,6 +1079,7 @@ class FlatMachine:
         self,
         input: Optional[Dict[str, Any]] = None,
         max_steps: int = 1000,
+        max_agent_calls: Optional[int] = None,
         resume_from: Optional[str] = None
     ) -> Dict[str, Any]:
         """Execute the machine."""
@@ -1094,6 +1095,7 @@ class FlatMachine:
             current_state = None
             step = 0
             final_output = {}
+            hit_agent_limit = False
             manager = CheckpointManager(self.persistence, self.execution_id)
 
             if resume_from:
@@ -1135,6 +1137,9 @@ class FlatMachine:
             logger.info(f"Starting execution loop at: {current_state}")
 
             while current_state and step < max_steps:
+                if max_agent_calls is not None and self.total_api_calls >= max_agent_calls:
+                    hit_agent_limit = True
+                    break
                 step += 1
                 is_final = current_state in self._final_states
 
@@ -1173,6 +1178,10 @@ class FlatMachine:
 
                 output = await self._run_hook('on_state_exit', current_state, context, output)
 
+                if max_agent_calls is not None and self.total_api_calls >= max_agent_calls:
+                    hit_agent_limit = True
+                    break
+
                 if is_final:
                     logger.info(f"Reached final state: {current_state}")
                     break
@@ -1187,6 +1196,8 @@ class FlatMachine:
 
             if step >= max_steps:
                 logger.warning(f"Machine hit max_steps limit ({max_steps})")
+            if hit_agent_limit and max_agent_calls is not None:
+                logger.warning(f"Machine hit max_agent_calls limit ({max_agent_calls})")
 
             await self._save_checkpoint('machine_end', 'end', step, context, output=final_output)
             final_output = await self._run_hook('on_machine_end', context, final_output)
@@ -1203,11 +1214,12 @@ class FlatMachine:
     def execute_sync(
         self,
         input: Optional[Dict[str, Any]] = None,
-        max_steps: int = 1000
+        max_steps: int = 1000,
+        max_agent_calls: Optional[int] = None
     ) -> Dict[str, Any]:
         """Synchronous wrapper for execute()."""
         import asyncio
-        return asyncio.run(self.execute(input=input, max_steps=max_steps))
+        return asyncio.run(self.execute(input=input, max_steps=max_steps, max_agent_calls=max_agent_calls))
 
 
 __all__ = ["FlatMachine"]

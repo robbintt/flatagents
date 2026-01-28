@@ -181,16 +181,19 @@ class RetryExecution(ExecutionType):
     def __init__(
         self,
         backoffs: Optional[List[float]] = None,
-        jitter: float = 0.1
+        jitter: float = 0.1,
+        retry_on_empty: bool = False
     ):
         self.backoffs = backoffs if backoffs is not None else self.DEFAULT_BACKOFFS
         self.jitter = jitter
+        self.retry_on_empty = retry_on_empty
     
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "RetryExecution":
         return cls(
             backoffs=config.get("backoffs"),
-            jitter=config.get("jitter", 0.1)
+            jitter=config.get("jitter", 0.1),
+            retry_on_empty=config.get("retry_on_empty", False)
         )
     
     def _apply_jitter(self, delay: float) -> float:
@@ -217,6 +220,8 @@ class RetryExecution(ExecutionType):
                 elif result.content:
                     return {"content": result.content}
                 else:
+                    if self.retry_on_empty:
+                        raise ValueError("Empty response from agent")
                     return {}
                     
             except Exception as e:
@@ -461,4 +466,3 @@ __all__ = [
     "get_execution_type",
     "register_execution_type",
 ]
-

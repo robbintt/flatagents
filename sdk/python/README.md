@@ -293,3 +293,31 @@ For OpenTelemetry metrics:
 pip install flatagents[metrics]
 export FLATAGENTS_METRICS_ENABLED=true
 ```
+
+Metrics are enabled by default and print to stdout every 5s. Redirect to file or use OTLP for production:
+
+```bash
+# Metrics print to stdout by default
+python your_script.py
+
+# Save to file
+python your_script.py >> metrics.log 2>&1
+
+# Disable if needed
+FLATAGENTS_METRICS_ENABLED=false python your_script.py
+
+# Send to OTLP collector for production
+OTEL_METRICS_EXPORTER=otlp \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+python your_script.py
+```
+
+**Env vars for metrics**:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FLATAGENTS_METRICS_ENABLED` | `true` | Enable OpenTelemetry metrics |
+| `OTEL_METRICS_EXPORTER` | `console` | `console` (stdout) or `otlp` (production) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OTLP collector endpoint |
+| `OTEL_METRIC_EXPORT_INTERVAL` | `5000` / `60000` | Export interval in ms (5s for console, 60s for otlp) |
+| `OTEL_SERVICE_NAME` | `flatagents` | Service name in metrics |

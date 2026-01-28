@@ -4,11 +4,14 @@ Monitoring and observability utilities for FlatAgents.
 Provides standardized logging configuration and OpenTelemetry-based metrics.
 """
 
+import json
 import logging
 import os
 import sys
 import time
 from contextlib import contextmanager
+from dataclasses import is_dataclass, fields
+from enum import Enum
 from typing import Any, Dict, Optional
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,6 +121,7 @@ def get_logger(name: str) -> logging.Logger:
 _otel_available = False
 _meter = None
 _metrics_enabled = False
+_metrics_init_attempted = False  # Prevent repeated init attempts
 _cached_histograms: Dict[str, Any] = {}  # Cache for histogram instruments
 
 try:
@@ -133,10 +137,12 @@ except ImportError:
 
 def _init_metrics() -> None:
     """Initialize OpenTelemetry metrics if enabled and available."""
-    global _meter, _metrics_enabled
-    
-    # Check if metrics should be enabled
-    enabled = os.getenv('FLATAGENTS_METRICS_ENABLED', 'false').lower() in ('true', '1', 'yes')
+    global _meter, _metrics_enabled, _metrics_init_attempted
+
+    _metrics_init_attempted = True
+
+    # Check if metrics should be enabled (default: true)
+    enabled = os.getenv('FLATAGENTS_METRICS_ENABLED', 'true').lower() not in ('false', '0', 'no')
     
     if not enabled:
         _metrics_enabled = False
@@ -160,14 +166,81 @@ def _init_metrics() -> None:
             SERVICE_NAME: service_name
         })
         
-        # Check which exporter to use
-        exporter_type = os.getenv('OTEL_METRICS_EXPORTER', 'otlp').lower()
+        # Check which exporter to use (default to console so metrics are visible)
+        exporter_type = os.getenv('OTEL_METRICS_EXPORTER', 'console').lower()
         
         if exporter_type == 'console':
             # Use console exporter for testing/debugging
             try:
-                from opentelemetry.sdk.metrics.export import ConsoleMetricExporter
-                exporter = ConsoleMetricExporter()
+                from opentelemetry.sdk.metrics.export import (
+                    ConsoleMetricExporter,
+                    MetricExporter,
+                    MetricExportResult,
+                )
+
+                def _to_jsonable(value):
+                    if value is None or isinstance(value, (str, int, float, bool)):
+                        return value
+                    if isinstance(value, Enum):
+                        return value.value
+                    if is_dataclass(value):
+                        return {f.name: _to_jsonable(getattr(value, f.name)) for f in fields(value)}
+                    if isinstance(value, dict):
+                        return {str(k): _to_jsonable(v) for k, v in value.items()}
+                    if isinstance(value, (list, tuple, set)):
+                        return [_to_jsonable(v) for v in value]
+                    if hasattr(value, "__dict__"):
+                        return {str(k): _to_jsonable(v) for k, v in vars(value).items()}
+                    return str(value)
+
+                def _compact_metrics_formatter(metrics_data) -> str:
+                    try:
+                        from opentelemetry.sdk.metrics.export import MetricsJSONEncoder
+                        line = json.dumps(metrics_data, cls=MetricsJSONEncoder, separators=(",", ":"))
+                    except Exception:
+                        try:
+                            from opentelemetry.sdk.metrics.export import metrics_to_json
+                            compact = metrics_to_json(metrics_data)
+                            if isinstance(compact, str):
+                                line = compact.replace("\n", "")
+                            else:
+                                line = json.dumps(compact, separators=(",", ":"))
+                        except Exception:
+                            line = json.dumps(_to_jsonable(metrics_data), separators=(",", ":"))
+                    if not line.endswith("\n"):
+                        line = f"{line}\n"
+                    return line
+
+                class _CompactConsoleMetricExporter(MetricExporter):
+                    def __init__(self, preferred_temporality=None, preferred_aggregation=None):
+                        super().__init__(
+                            preferred_temporality=preferred_temporality,
+                            preferred_aggregation=preferred_aggregation,
+                        )
+
+                    def export(self, metrics_data):
+                        try:
+                            line = _compact_metrics_formatter(metrics_data)
+                            sys.stdout.write(line)
+                            sys.stdout.flush()
+                            return MetricExportResult.SUCCESS
+                        except Exception:
+                            return MetricExportResult.FAILURE
+
+                    def shutdown(self, timeout_millis: int = 30000):
+                        return None
+
+                    def force_flush(self, timeout_millis: int = 30000):
+                        return True
+
+                try:
+                    import inspect
+                    if "formatter" in inspect.signature(ConsoleMetricExporter).parameters:
+                        exporter = ConsoleMetricExporter(formatter=_compact_metrics_formatter)
+                    else:
+                        exporter = _CompactConsoleMetricExporter()
+                except Exception:
+                    exporter = _CompactConsoleMetricExporter()
             except ImportError:
                 logger = get_logger(__name__)
                 logger.warning("Console exporter not available, falling back to OTLP")
@@ -220,10 +293,10 @@ def get_meter():
         ...     counter.add(1, {"attribute": "value"})
     """
     global _meter
-    
-    if _meter is None and not _metrics_enabled:
+
+    if not _metrics_init_attempted:
         _init_metrics()
-    
+
     return _meter
 
 

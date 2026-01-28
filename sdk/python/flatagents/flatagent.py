@@ -13,7 +13,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import __version__
-from .monitoring import get_logger
+from .monitoring import get_logger, AgentMonitor
 from .utils import strip_markdown_json, check_spec_version
 from .baseagent import (
     FlatAgent as BaseFlatAgent,
@@ -702,15 +702,26 @@ class FlatAgent:
         if self.output_schema and not tools:
             params["response_format"] = {"type": "json_object"}
 
-        # Call LLM via selected backend
-        response = await self._call_llm(params)
+        # Call LLM via selected backend with metrics tracking
+        input_tokens = 0
+        output_tokens = 0
+        estimated_cost = 0.0
+        with AgentMonitor(
+            self.agent_name,
+            extra_attributes={"model": self.model, "backend": self._backend}
+        ) as monitor:
+            response = await self._call_llm(params)
+            if hasattr(response, 'usage') and response.usage:
+                input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
+                output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
+                estimated_cost = (input_tokens * 0.001 + output_tokens * 0.002) / 1000
+                monitor.metrics["tokens"] = input_tokens + output_tokens
+                monitor.metrics["cost"] = estimated_cost
 
         # Track usage
         self.total_api_calls += 1
-        if hasattr(response, 'usage') and response.usage:
-            input_tokens = getattr(response.usage, 'prompt_tokens', 0)
-            output_tokens = getattr(response.usage, 'completion_tokens', 0)
-            self.total_cost += (input_tokens * 0.001 + output_tokens * 0.002) / 1000
+        if input_tokens or output_tokens:
+            self.total_cost += estimated_cost
 
         # Extract response
         message = response.choices[0].message

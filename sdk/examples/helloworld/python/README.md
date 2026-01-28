@@ -47,3 +47,20 @@ If you prefer to set up the environment manually:
     ```bash
     uv run python -m flatagent_helloworld.main
     ```
+
+## Metrics
+
+Metrics are enabled by default and print to stdout every 5s:
+
+```bash
+# Metrics visible in output
+./run.sh
+
+# Save to file
+./run.sh >> metrics.log 2>&1
+
+# Disable if needed
+FLATAGENTS_METRICS_ENABLED=false ./run.sh
+```
+
+For production, use `OTEL_METRICS_EXPORTER=otlp` with an OTLP-compatible collector.

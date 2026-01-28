@@ -11,21 +11,15 @@ data:
   # Override max_tokens for this specific agent
   model:
     profile: "fast-cheap"
-    max_tokens: 64
+    max_tokens: 2000 # or turn off thinking, glm 4.7 always overthinks
 
   system: >
-    You are an assistant that follows instructions perfectly
-    and responds with only the requested content.
+    You are an agent in a test-time sequential scaling. Reply with exactly one output character in text format. No explanation. No wrapper.
 
   user: |
-    The goal is to build the exact string: '{{ input.target }}'.
-    The current string is: '{{ input.current }}'.
-    Provide the single next character to append. Wrap the character in double quotes (e.g., "a" or " "). Respond with only the quoted character and nothing else.
-
-  output:
-    next_char:
-      type: str
-      description: "The single next character to append"
+    Target: '{{ input.target }}'
+    Built so far: '{{ input.current }}'
+    Next character:
 
 metadata:
   description: "Builds a target string character by character"
