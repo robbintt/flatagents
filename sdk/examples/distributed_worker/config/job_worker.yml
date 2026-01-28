@@ -1,0 +1,86 @@
+spec: flatmachine
+spec_version: "0.8.3"
+
+data:
+  name: job_worker
+  
+  settings:
+    heartbeat_interval: 30  # seconds
+  
+  context:
+    pool_id: "{{ input.pool_id | default('default') }}"
+    worker_id: "{{ input.worker_id }}"
+  
+  hooks:
+    file: "../python/hooks.py"
+    class: "DistributedWorkerHooks"
+  
+  machines:
+    echo_processor:
+      file: "./echo_processor.yml"
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: register_worker
+    
+    register_worker:
+      action: register_worker
+      output_to_context:
+        registered_at: "{{ output.registered_at }}"
+      transitions:
+        - to: claim_job
+    
+    claim_job:
+      action: claim_job
+      output_to_context:
+        job: "{{ output.job }}"
+        job_id: "{{ output.job_id }}"
+      transitions:
+        - condition: "context.job == None"
+          to: no_work
+        - to: process_job
+    
+    process_job:
+      machine: echo_processor
+      input:
+        job: "{{ context.job }}"
+      output_to_context:
+        result: "{{ output }}"
+      on_error: job_failed
+      transitions:
+        - to: complete_job
+    
+    complete_job:
+      action: complete_job
+      transitions:
+        - to: deregister
+    
+    job_failed:
+      action: fail_job
+      transitions:
+        - to: deregister
+    
+    deregister:
+      action: deregister_worker
+      transitions:
+        - to: done
+    
+    no_work:
+      action: deregister_worker
+      transitions:
+        - to: no_work_final
+    
+    no_work_final:
+      type: final
+      output:
+        status: "no_work_available"
+        worker_id: "{{ context.worker_id }}"
+    
+    done:
+      type: final
+      output:
+        job_id: "{{ context.job_id }}"
+        result: "{{ context.result }}"
+        worker_id: "{{ context.worker_id }}"

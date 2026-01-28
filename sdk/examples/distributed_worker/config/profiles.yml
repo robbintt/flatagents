@@ -1,0 +1,7 @@
+# Model profiles for the distributed worker example
+# No LLM calls needed for this example, but required by FlatMachine
+
+profiles:
+  default:
+    provider: mock
+    model: none

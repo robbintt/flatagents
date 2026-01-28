@@ -1,0 +1,38 @@
+spec: flatmachine
+spec_version: "0.8.3"
+
+data:
+  name: echo_processor
+  
+  # Trivial job processor for testing.
+  # Just echoes the input after a configurable delay.
+  
+  context:
+    job: "{{ input.job }}"
+    delay_seconds: "{{ input.job.delay_seconds | default(1) }}"
+  
+  hooks:
+    file: "../python/hooks.py"
+    class: "DistributedWorkerHooks"
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: process
+    
+    process:
+      # Simulate processing with a delay
+      action: echo_delay
+      output_to_context:
+        processed: true
+      transitions:
+        - to: done
+    
+    done:
+      type: final
+      output:
+        status: "completed"
+        message: "{{ context.job.message }}"
+        job_number: "{{ context.job.job_number }}"
+        processed_at: "{{ now() }}"

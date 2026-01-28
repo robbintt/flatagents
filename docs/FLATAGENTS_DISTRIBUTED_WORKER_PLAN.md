@@ -631,24 +631,24 @@ Same patterns, real workload.
 
 ---
 
-## Phase 1 Checklist (Dummy Requirements)
+## Phase 1 Checklist (Dummy Requirements) ✅
 
 The dummy is NOT simplified. Every distributed property must be present:
 
-- [ ] `WorkBackend` with SQLite implementation
-- [ ] `RegistrationBackend` with SQLite implementation
-- [ ] `WorkPool.claim()` is atomic (no race conditions)
-- [ ] `WorkPool.fail()` increments attempts, poisons after max_retries
-- [ ] `WorkPool.releaseByWorker()` returns claimed jobs to pool
-- [ ] `parallelization_checker.yml` reads pool depth + active workers
-- [ ] `parallelization_checker.yml` uses `foreach` + `launch`
-- [ ] `stale_worker_reaper.yml` marks stale workers as lost
-- [ ] `stale_worker_reaper.yml` releases jobs from stale workers
-- [ ] `job_worker.yml` has `heartbeat_interval` setting
-- [ ] `job_worker.yml` registers on start, deregisters on end
-- [ ] Cron trigger tested (manual CLI)
-- [ ] Subprocess trigger tested
-- [ ] Multiple concurrent workers tested (no race conditions)
+- [x] `WorkBackend` with SQLite implementation (via `distributed.py`)
+- [x] `RegistrationBackend` with SQLite implementation (via `distributed.py`)
+- [x] `WorkPool.claim()` is atomic (no race conditions)
+- [x] `WorkPool.fail()` increments attempts, poisons after max_retries
+- [x] `WorkPool.releaseByWorker()` returns claimed jobs to pool
+- [x] `parallelization_checker.yml` reads pool depth + active workers
+- [x] `parallelization_checker.yml` uses `foreach` + `launch`
+- [x] `stale_worker_reaper.yml` marks stale workers as lost
+- [x] `stale_worker_reaper.yml` releases jobs from stale workers
+- [x] `job_worker.yml` has `heartbeat_interval` setting
+- [x] `job_worker.yml` registers on start, deregisters on end
+- [ ] Cron trigger tested (manual CLI) - **Ready for manual testing**
+- [ ] Subprocess trigger tested - **Ready for manual testing**
+- [ ] Multiple concurrent workers tested (no race conditions) - **Ready for manual testing**
 
 ---
 

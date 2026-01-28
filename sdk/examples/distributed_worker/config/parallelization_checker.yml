@@ -1,0 +1,57 @@
+spec: flatmachine
+spec_version: "0.8.3"
+
+data:
+  name: parallelization_checker
+  
+  context:
+    pool_id: "{{ input.pool_id | default('default') }}"
+    max_workers: "{{ input.max_workers | default(3) }}"
+  
+  hooks:
+    file: "../python/hooks.py"
+    class: "DistributedWorkerHooks"
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: check_state
+    
+    check_state:
+      action: get_pool_state
+      output_to_context:
+        queue_depth: "{{ output.queue_depth }}"
+        active_workers: "{{ output.active_workers }}"
+      transitions:
+        - to: calculate_spawn
+    
+    calculate_spawn:
+      # Calculate how many workers to spawn:
+      # - Can't exceed max_workers total
+      # - Need workers for pending jobs
+      # - Don't spawn more than queue depth
+      output_to_context:
+        workers_needed: "{{ [context.queue_depth, context.max_workers] | min }}"
+        workers_to_spawn: "{{ [[context.queue_depth, context.max_workers] | min - context.active_workers, 0] | max }}"
+      transitions:
+        - condition: "context.workers_to_spawn > 0"
+          to: spawn_workers
+        - to: done
+    
+    spawn_workers:
+      # Fire-and-forget spawn of worker machines
+      foreach: "{{ range(context.workers_to_spawn | int) }}"
+      as: worker_index
+      launch: job_worker
+      launch_input:
+        pool_id: "{{ context.pool_id }}"
+      transitions:
+        - to: done
+    
+    done:
+      type: final
+      output:
+        spawned: "{{ context.workers_to_spawn | default(0) }}"
+        queue_depth: "{{ context.queue_depth }}"
+        active_workers: "{{ context.active_workers }}"
