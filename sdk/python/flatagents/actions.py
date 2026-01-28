@@ -241,3 +241,160 @@ class QueueInvoker(MachineInvoker):
         """Override in subclass to enqueue to your queue provider."""
         raise NotImplementedError("Subclass must implement _enqueue()")
 
+
+class SubprocessInvoker(MachineInvoker):
+    """
+    Invoker that launches machines as independent subprocesses.
+    
+    For local distributed execution where each worker is a separate process.
+    Used by the parallelization checker to spawn worker machines.
+    
+    The subprocess runs `python -m flatagents.run` with the machine config,
+    enabling true process isolation and independent lifecycle.
+    """
+    
+    def __init__(self, 
+                 machine_path: Optional[str] = None,
+                 working_dir: Optional[str] = None):
+        """
+        Args:
+            machine_path: Base path for resolving machine configs
+            working_dir: Working directory for spawned processes
+        """
+        self.machine_path = machine_path
+        self.working_dir = working_dir
+    
+    async def invoke(
+        self,
+        caller_machine: 'FlatMachine',
+        target_config: Dict[str, Any],
+        input_data: Dict[str, Any],
+        execution_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Launch subprocess and poll for result."""
+        import uuid
+        from .backends import make_uri
+        
+        if not execution_id:
+            execution_id = str(uuid.uuid4())
+        
+        await self.launch(caller_machine, target_config, input_data, execution_id)
+        
+        # Block until result is available
+        uri = make_uri(execution_id, "result")
+        return await caller_machine.result_backend.read(uri, block=True)
+    
+    async def launch(
+        self,
+        caller_machine: 'FlatMachine',
+        target_config: Dict[str, Any],
+        input_data: Dict[str, Any],
+        execution_id: str
+    ) -> None:
+        """Launch machine as independent subprocess (fire-and-forget)."""
+        import subprocess
+        import sys
+        import json
+        import tempfile
+        import os
+        
+        target_name = target_config.get('data', {}).get('name', 'unknown')
+        logger.info(f"Launching subprocess: {target_name} (ID: {execution_id})")
+        
+        # Write config to temp file for subprocess to read
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            suffix='.json', 
+            delete=False,
+            dir=self.working_dir
+        ) as f:
+            json.dump(target_config, f)
+            config_path = f.name
+        
+        # Build command
+        cmd = [
+            sys.executable, "-m", "flatagents.run",
+            "--config", config_path,
+            "--input", json.dumps(input_data),
+            "--execution-id", execution_id,
+        ]
+        
+        # Add parent execution ID for lineage tracking
+        if caller_machine.execution_id:
+            cmd.extend(["--parent-id", caller_machine.execution_id])
+        
+        # Spawn detached process
+        cwd = self.working_dir or caller_machine._config_dir
+        
+        # Use Popen for fire-and-forget
+        subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True  # Detach from parent process group
+        )
+        
+        logger.debug(f"Subprocess launched: {' '.join(cmd)}")
+
+
+def launch_machine(
+    machine_config: str,
+    input_data: Dict[str, Any],
+    execution_id: Optional[str] = None,
+    working_dir: Optional[str] = None,
+    parent_id: Optional[str] = None
+) -> str:
+    """
+    Fire-and-forget machine execution via subprocess.
+    
+    Standalone utility function for launching machines without an existing
+    FlatMachine context. Useful for trigger scripts and manual invocation.
+    
+    Args:
+        machine_config: Path to machine YAML file
+        input_data: Input dictionary for the machine
+        execution_id: Optional predetermined execution ID
+        working_dir: Working directory for the subprocess
+        parent_id: Optional parent execution ID for lineage
+        
+    Returns:
+        The execution ID of the launched machine
+        
+    Example:
+        # From a trigger script
+        exec_id = launch_machine(
+            "job_worker.yml",
+            {"pool_id": "paper_analysis"},
+            working_dir="/path/to/project"
+        )
+    """
+    import subprocess
+    import sys
+    import json
+    import uuid
+    
+    if not execution_id:
+        execution_id = str(uuid.uuid4())
+    
+    cmd = [
+        sys.executable, "-m", "flatagents.run",
+        "--config", machine_config,
+        "--input", json.dumps(input_data),
+        "--execution-id", execution_id,
+    ]
+    
+    if parent_id:
+        cmd.extend(["--parent-id", parent_id])
+    
+    subprocess.Popen(
+        cmd,
+        cwd=working_dir,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    
+    logger.info(f"Launched machine subprocess: {machine_config} (ID: {execution_id})")
+    return execution_id
+

@@ -538,29 +538,29 @@ Before the dummy can use distributed backends, the SDK must support them.
 
 **Tasks**:
 
-1. **Update `flatagents-runtime.d.ts`**
-   - [ ] Add `RegistrationBackend` interface
-   - [ ] Add `WorkBackend` interface
-   - [ ] Add `WorkerStatus`, `WorkerRegistration`, `WorkerRecord`, `WorkItem` types
-   - [ ] Extend `BackendConfig` with `registration`, `work` selectors
-   - [ ] Extend `SDKRuntimeWrapper` with `registration_backend`, `work_backend`
+1. **Update `flatagents-runtime.d.ts`** ✅
+   - [x] Add `RegistrationBackend` interface
+   - [x] Add `WorkBackend` interface
+   - [x] Add `WorkerStatus`, `WorkerRegistration`, `WorkerRecord`, `WorkItem` types
+   - [x] Extend `BackendConfig` with `registration`, `work` selectors
+   - [x] Extend `SDKRuntimeWrapper` with `registration_backend`, `work_backend`
 
-2. **Python SDK implementation** (`sdk/python/`)
-   - [ ] `SQLiteRegistrationBackend` class
-   - [ ] `SQLiteWorkBackend` class
-   - [ ] `MemoryRegistrationBackend` class (for tests)
-   - [ ] `MemoryWorkBackend` class (for tests)
-   - [ ] Backend factory to instantiate from config
-   - [ ] Update `MachineHooks` base class with backend access pattern
+2. **Python SDK implementation** (`sdk/python/`) ✅
+   - [x] `SQLiteRegistrationBackend` class
+   - [x] `SQLiteWorkBackend` class
+   - [x] `MemoryRegistrationBackend` class (for tests)
+   - [x] `MemoryWorkBackend` class (for tests)
+   - [x] Backend factory to instantiate from config
+   - [x] Integration test passing
 
-3. **Launch subprocess support** (`sdk/python/`)
-   - [ ] `launch_machine()` function for local subprocess execution
-   - [ ] Integration with `launch:` state field
-   - [ ] Execution ID generation and passing
+3. **Launch subprocess support** (`sdk/python/`) ✅
+   - [x] `SubprocessInvoker` class for fire-and-forget execution
+   - [x] `launch_machine()` standalone utility function
+   - [x] `run.py` CLI entry point module
 
-4. **Machine settings parsing**
-   - [ ] Parse `heartbeat_interval` from settings
-   - [ ] Wire automatic heartbeat calls on state transitions
+4. **Machine settings parsing** (Deferred to Phase 1)
+   - [ ] Parse `heartbeat_interval` from settings (implement when building worker example)
+   - [ ] Wire automatic heartbeat calls (implement when building worker example)
 
 **Deliverable**: SDK can instantiate `RegistrationBackend` and `WorkBackend` from machine config.
 

@@ -13,6 +13,8 @@
  *   - ResultBackend: InMemoryResultBackend (MUST)
  *   - ExecutionType: Default, Retry, Parallel, MDAPVoting (MUST)
  *   - MachineHooks: Base interface (MUST)
+ *   - RegistrationBackend: SQLiteRegistrationBackend (MUST), MemoryRegistrationBackend (SHOULD)
+ *   - WorkBackend: SQLiteWorkBackend (MUST), MemoryWorkBackend (SHOULD)
  *
  * OPTIONAL IMPLEMENTATIONS:
  * -------------------------
@@ -314,6 +316,158 @@ export interface LaunchIntent {
     launched: boolean;
 }
 
+/**
+ * REGISTRATION BACKEND:
+ * ---------------------
+ * Worker lifecycle management for distributed execution.
+ *
+ * SDKs MUST provide:
+ *   - SQLiteRegistrationBackend: For local deployments
+ *
+ * SDKs SHOULD provide:
+ *   - MemoryRegistrationBackend: For testing
+ *
+ * Implementation notes:
+ *   - Time units: Python reference SDK uses seconds for all interval values
+ *   - Stale threshold: SDKs SHOULD default to 2× heartbeat_interval if not specified
+ */
+export interface RegistrationBackend {
+    /**
+     * Register a new worker.
+     * Creates a new worker record with status "active".
+     */
+    register(worker: WorkerRegistration): Promise<WorkerRecord>;
+
+    /**
+     * Update worker's last_heartbeat timestamp.
+     * Can optionally update metadata.
+     */
+    heartbeat(worker_id: string, metadata?: Record<string, any>): Promise<void>;
+
+    /**
+     * Update worker status.
+     * Status values (string, not enum for extensibility):
+     *   - "active": Worker is running and healthy
+     *   - "terminating": Worker received shutdown signal
+     *   - "terminated": Worker exited cleanly
+     *   - "lost": Worker failed heartbeat, presumed dead
+     */
+    updateStatus(worker_id: string, status: string): Promise<void>;
+
+    /**
+     * Get a worker record by ID.
+     * @returns The worker record, or null if not found
+     */
+    get(worker_id: string): Promise<WorkerRecord | null>;
+
+    /**
+     * List workers matching filter criteria.
+     */
+    list(filter?: WorkerFilter): Promise<WorkerRecord[]>;
+}
+
+export interface WorkerRegistration {
+    worker_id: string;
+    host?: string;
+    pid?: number;
+    capabilities?: string[];  // e.g., ["gpu", "paper-analysis"]
+    pool_id?: string;         // Worker pool grouping
+    started_at: string;
+}
+
+export interface WorkerRecord extends WorkerRegistration {
+    status: string;           // See status values in RegistrationBackend.updateStatus
+    last_heartbeat: string;
+    current_task_id?: string;
+}
+
+export interface WorkerFilter {
+    status?: string | string[];
+    capability?: string;
+    pool_id?: string;
+    stale_threshold_seconds?: number;  // Filter workers with old heartbeats
+}
+
+/**
+ * WORK BACKEND:
+ * -------------
+ * Work distribution via named pools with atomic claim.
+ *
+ * SDKs MUST provide:
+ *   - SQLiteWorkBackend: For local deployments
+ *
+ * SDKs SHOULD provide:
+ *   - MemoryWorkBackend: For testing
+ *
+ * Implementation notes:
+ *   - Atomic claim: SDKs MUST ensure no two workers can claim the same job
+ *   - Test requirements: Include concurrent claim race condition tests
+ */
+export interface WorkBackend {
+    /**
+     * Get a named work pool.
+     * Creates the pool if it doesn't exist.
+     */
+    pool(name: string): WorkPool;
+}
+
+export interface WorkPool {
+    /**
+     * Add work item to the pool.
+     * @param item - The work data (will be JSON serialized)
+     * @param options.max_retries - Max retry attempts before poisoning (default: 3)
+     * @returns The item ID
+     */
+    push(item: any, options?: { max_retries?: number }): Promise<string>;
+
+    /**
+     * Atomically claim next available item.
+     * MUST be atomic - no two workers can claim the same job.
+     * @returns The claimed item, or null if pool is empty
+     */
+    claim(worker_id: string): Promise<WorkItem | null>;
+
+    /**
+     * Mark item as complete.
+     * Sets status to "done" and stores result.
+     */
+    complete(item_id: string, result?: any): Promise<void>;
+
+    /**
+     * Mark item as failed.
+     * Increments attempts. If attempts >= max_retries, marks as "poisoned".
+     * Otherwise returns to "pending" status for retry.
+     */
+    fail(item_id: string, error?: string): Promise<void>;
+
+    /**
+     * Get pool depth (unclaimed pending items).
+     */
+    size(): Promise<number>;
+
+    /**
+     * Release all jobs claimed by a worker.
+     * Used for stale worker cleanup.
+     * @returns Number of jobs released
+     */
+    releaseByWorker(worker_id: string): Promise<number>;
+}
+
+export interface WorkItem {
+    id: string;
+    data: any;
+    claimed_by?: string;
+    claimed_at?: string;
+    attempts: number;
+    max_retries: number;  // default: 3
+}
+
+// Job status values (string):
+// - "pending": Available for claim
+// - "claimed": Currently being processed
+// - "done": Successfully completed
+// - "poisoned": Failed max_retries times, will not be retried
+
 export interface BackendConfig {
     /** Checkpoint storage. Default: memory */
     persistence?: "memory" | "local" | "redis" | "postgres" | "s3";
@@ -323,6 +477,15 @@ export interface BackendConfig {
 
     /** Inter-machine results. Default: memory */
     results?: "memory" | "redis";
+
+    /** Worker registration. Default: memory */
+    registration?: "memory" | "sqlite" | "redis";
+
+    /** Work pool. Default: memory */
+    work?: "memory" | "sqlite" | "redis";
+
+    /** Path for sqlite backends (registration and work share this) */
+    sqlite_path?: string;
 }
 
 export const SPEC_VERSION = "0.8.3";
@@ -332,15 +495,18 @@ export const SPEC_VERSION = "0.8.3";
  * Groups all runtime interfaces that SDKs must implement.
  */
 export interface SDKRuntimeWrapper {
-  spec: "flatagents-runtime";
-  spec_version: typeof SPEC_VERSION;
-  execution_lock?: ExecutionLock;
-  persistence_backend?: PersistenceBackend;
-  result_backend?: ResultBackend;
-  execution_config?: ExecutionConfig;
-  machine_hooks?: MachineHooks;
-  llm_backend?: LLMBackend;
-  machine_invoker?: MachineInvoker;
-  backend_config?: BackendConfig;
-  machine_snapshot?: MachineSnapshot;
+    spec: "flatagents-runtime";
+    spec_version: typeof SPEC_VERSION;
+    execution_lock?: ExecutionLock;
+    persistence_backend?: PersistenceBackend;
+    result_backend?: ResultBackend;
+    execution_config?: ExecutionConfig;
+    machine_hooks?: MachineHooks;
+    llm_backend?: LLMBackend;
+    machine_invoker?: MachineInvoker;
+    backend_config?: BackendConfig;
+    machine_snapshot?: MachineSnapshot;
+    registration_backend?: RegistrationBackend;
+    work_backend?: WorkBackend;
 }
+

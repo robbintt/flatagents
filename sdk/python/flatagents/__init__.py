@@ -27,6 +27,10 @@ from .hooks import (
     MetricsHooks,
     CompositeHooks,
 )
+from .actions import (
+    SubprocessInvoker,
+    launch_machine,
+)
 from .expressions import get_expression_engine, ExpressionEngine
 from .execution import (
     ExecutionType,
@@ -70,6 +74,26 @@ from .persistence import (
 from .profiles import (
     ProfileManager,
     resolve_model_config,
+)
+from .distributed import (
+    # Types
+    WorkerRegistration,
+    WorkerRecord,
+    WorkerFilter,
+    WorkItem,
+    # Protocols
+    RegistrationBackend,
+    WorkBackend,
+    WorkPool,
+    # Memory implementations
+    MemoryRegistrationBackend,
+    MemoryWorkBackend,
+    # SQLite implementations
+    SQLiteRegistrationBackend,
+    SQLiteWorkBackend,
+    # Factory functions
+    create_registration_backend,
+    create_work_backend,
 )
 
 __all__ = [
@@ -140,4 +164,21 @@ __all__ = [
     # Model Profiles
     "ProfileManager",
     "resolve_model_config",
+    # Distributed Backends (v0.9.0)
+    "WorkerRegistration",
+    "WorkerRecord",
+    "WorkerFilter",
+    "WorkItem",
+    "RegistrationBackend",
+    "WorkBackend",
+    "WorkPool",
+    "MemoryRegistrationBackend",
+    "MemoryWorkBackend",
+    "SQLiteRegistrationBackend",
+    "SQLiteWorkBackend",
+    "create_registration_backend",
+    "create_work_backend",
+    # Subprocess execution (v0.9.0)
+    "SubprocessInvoker",
+    "launch_machine",
 ]
