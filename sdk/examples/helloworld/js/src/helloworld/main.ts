@@ -2,83 +2,100 @@
 import { FlatMachine, MachineHooks } from '@memgrafter/flatagents';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
-import { parse } from 'yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..', '..', '..');
 const configDir = join(rootDir, 'config');
+const maxAgentCalls = 20;
 
-// Load profiles to show which provider is being used
-function getDefaultProfile(): { provider: string; name: string } {
-  try {
-    const profilesPath = join(configDir, 'profiles.yml');
-    const profilesYaml = readFileSync(profilesPath, 'utf-8');
-    const profiles = parse(profilesYaml);
-    const defaultName = profiles.data.default;
-    const profile = profiles.data.model_profiles[defaultName];
-    return { provider: profile.provider, name: profile.name };
-  } catch {
-    return { provider: 'unknown', name: 'unknown' };
-  }
-}
-
-// Progress hooks for incremental output
-class ProgressHooks implements MachineHooks {
-  private stepCount = 0;
-  private startTime = Date.now();
-  private previousCurrent = '';
+class HelloWorldHooks implements MachineHooks {
+  private agentCalls = 0;
 
   onStateEnter(state: string, context: Record<string, any>) {
     if (state === 'build_char') {
-      this.stepCount++;
-      this.previousCurrent = context.current || '';
-      const target = context.target || '';
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
-      process.stdout.write(`\r[${elapsed}s] Step ${this.stepCount}: "${this.previousCurrent}" → "${this.previousCurrent}_" (${this.previousCurrent.length}/${target.length})`);
+      this.agentCalls += 1;
+      if (this.agentCalls > maxAgentCalls) {
+        throw new Error(`Max agent calls exceeded (${maxAgentCalls})`);
+      }
     }
     return context;
   }
 
   onStateExit(state: string, context: Record<string, any>, output: any) {
-    if (state === 'build_char' && output?.next_char) {
-      const newCurrent = this.previousCurrent + output.next_char;
-      const target = context.target || '';
-      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
-      process.stdout.write(`\r[${elapsed}s] Step ${this.stepCount}: "${this.previousCurrent}" → "${newCurrent}" (${newCurrent.length}/${target.length})\n`);
+    if (state === 'build_char' && output !== undefined && output !== null) {
+      const nextChar =
+        typeof output === 'string' ? output : (output.next_char ?? output.content);
+      if (nextChar !== undefined && nextChar !== null) {
+        const current = context.current ?? '';
+        const expected = context.expected_char;
+        const status = expected !== undefined && nextChar === expected ? 'match' : 'mismatch';
+        console.log(`${current}${nextChar} (${status})`);
+      }
     }
     return output;
   }
+
+  onAction(action: string, context: Record<string, any>) {
+    if (action === 'append_char') {
+      const lastOutput = context.last_output ?? '';
+      context.current = (context.current ?? '') + lastOutput;
+    }
+    return context;
+  }
+}
+
+function collectStats(machine: FlatMachine): { totalCost: number; totalApiCalls: number } {
+  const internal = machine as any;
+  const agents: Map<string, any> | undefined = internal.agents;
+  let totalCost = 0;
+  let totalApiCalls = 0;
+  if (agents instanceof Map) {
+    for (const agent of agents.values()) {
+      const backend = agent?.llmBackend;
+      if (backend) {
+        totalCost += backend.totalCost ?? 0;
+        totalApiCalls += backend.totalApiCalls ?? 0;
+      }
+    }
+  }
+  return { totalCost, totalApiCalls };
 }
 
 async function main() {
-  const profile = getDefaultProfile();
-  console.log(`Provider: ${profile.provider} (${profile.name})`);
+  console.log('--- Starting FlatMachine HelloWorld Demo ---');
 
-  const hooks = new ProgressHooks();
   const machine = new FlatMachine({
     config: join(configDir, 'machine.yml'),
     configDir,
-    hooks,
+    hooks: new HelloWorldHooks(),
   });
 
-  try {
-    const target = "Hello, World!";
-    console.log(`Target: '${target}'`);
-    console.log('Building character by character...\n');
+  console.log(`Machine: ${machine.config?.data?.name ?? 'unknown'}`);
+  console.log(`States: ${Object.keys(machine.config?.data?.states ?? {})}`);
 
+  const target = 'Hello, World!';
+  console.log(`Target: '${target}'`);
+  console.log('Building character by character...');
+
+  try {
     const result = await machine.execute({ target });
 
-    console.log('\nResult:', JSON.stringify(result, null, 2));
+    console.log('--- Execution Complete ---');
+    console.log(`Final: '${result?.result ?? ''}'`);
 
     if (result?.success) {
-      console.log('✅ Success! The machine built the string correctly.');
+      console.log('Success! The machine built the string correctly.');
     } else {
-      console.log('❌ Failure. The machine did not build the string correctly.');
+      console.warn('Failure. The machine did not build the string correctly.');
     }
+
+    const stats = collectStats(machine);
+    console.log('--- Execution Statistics ---');
+    console.log(`Total Cost: $${stats.totalCost.toFixed(4)}`);
+    console.log(`Total API Calls: ${stats.totalApiCalls}`);
   } catch (error) {
-    console.error('\nError:', error);
+    console.error('Error:', error);
   }
 }
 
