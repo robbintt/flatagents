@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, TYPE_CHECKING
 import logging
+import os
 
 if TYPE_CHECKING:
     from .flatmachine import FlatMachine
@@ -390,6 +391,7 @@ def launch_machine(
     subprocess.Popen(
         cmd,
         cwd=working_dir,
+        env=os.environ.copy(),  # Pass parent environment (includes PYTHONPATH, venv)
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True

@@ -23,6 +23,32 @@ _loggers: Dict[str, logging.Logger] = {}
 _logging_configured = False
 
 
+class JSONFormatter(logging.Formatter):
+    """
+    Production-ready JSON log formatter.
+    
+    Properly escapes message content and includes exception info.
+    """
+    
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "time": self.formatTime(record, '%Y-%m-%dT%H:%M:%S'),
+            "name": record.name,
+            "level": record.levelname,
+            "message": record.getMessage(),
+        }
+        
+        # Add exception info if present
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields if any
+        if hasattr(record, 'extra') and record.extra:
+            log_entry["extra"] = record.extra
+        
+        return json.dumps(log_entry, ensure_ascii=False)
+
+
 def setup_logging(
     level: Optional[str] = None,
     format: Optional[str] = None,
@@ -42,12 +68,19 @@ def setup_logging(
                 Defaults to FLATAGENTS_LOG_FORMAT env var or 'standard'.
         force: If True, reconfigure even if already configured.
     
+    Environment Variables:
+        FLATAGENTS_LOG_DIR: If set, logs will be written to files in this directory.
+                           Each process gets a unique log file with PID and timestamp.
+        FLATAGENTS_LOG_LEVEL: Default log level (DEBUG, INFO, etc.)
+        FLATAGENTS_LOG_FORMAT: Log format style
+    
     Example:
         >>> from flatagents import setup_logging
         >>> setup_logging(level='DEBUG')
         >>> # Or via environment:
         >>> # export FLATAGENTS_LOG_LEVEL=DEBUG
         >>> # export FLATAGENTS_LOG_FORMAT=json
+        >>> # export FLATAGENTS_LOG_DIR=/path/to/logs
     """
     global _logging_configured
     
@@ -64,25 +97,51 @@ def setup_logging(
     if format is None:
         format = os.getenv('FLATAGENTS_LOG_FORMAT', 'standard')
     
+    # Create appropriate formatter
     if format == 'json':
-        # Structured JSON logging - note: message content should be escaped by caller for true JSON safety
-        log_format = '{"time":"%(asctime)s","name":"%(name)s","level":"%(levelname)s","message":%(message)s}'
+        formatter = JSONFormatter()
     elif format == 'simple':
         log_format = '%(levelname)s - %(message)s'
+        formatter = logging.Formatter(log_format, datefmt='%Y-%m-%d %H:%M:%S')
     elif format == 'standard':
         log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        formatter = logging.Formatter(log_format, datefmt='%Y-%m-%d %H:%M:%S')
     else:
         # Custom format string
-        log_format = format
+        formatter = logging.Formatter(format, datefmt='%Y-%m-%d %H:%M:%S')
     
-    # Configure root logger for the SDK
-    logging.basicConfig(
-        level=log_level,
-        format=log_format,
-        datefmt='%Y-%m-%d %H:%M:%S',
-        stream=sys.stdout,
-        force=force
-    )
+    # Get root logger for flatagents
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    
+    # Clear existing handlers if force
+    if force:
+        root_logger.handlers.clear()
+    
+    # Always add stdout handler
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    root_logger.addHandler(stdout_handler)
+    
+    # Add file handler if FLATAGENTS_LOG_DIR is set
+    log_dir = os.getenv('FLATAGENTS_LOG_DIR')
+    if log_dir:
+        from datetime import datetime
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Create unique log file per process (PID + timestamp)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pid = os.getpid()
+        log_file = os.path.join(log_dir, f"flatagents_{pid}_{timestamp}.log")
+        
+        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+        
+        # Log where we're writing to
+        root_logger.info(f"Logging to file: {log_file}")
     
     _logging_configured = True
 
