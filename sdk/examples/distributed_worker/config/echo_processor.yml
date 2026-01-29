@@ -8,8 +8,7 @@ data:
   # Just echoes the input after a configurable delay.
   
   context:
-    job: "{{ input.job }}"
-    delay_seconds: "{{ input.job.delay_seconds | default(1) }}"
+    delay_seconds: 1
   
   hooks:
     file: "../python/hooks.py"
@@ -25,7 +24,7 @@ data:
       # Simulate processing with a delay
       action: echo_delay
       output_to_context:
-        processed: true
+        processed: "{{ output.processed }}"
       transitions:
         - to: done
     
@@ -33,6 +32,4 @@ data:
       type: final
       output:
         status: "completed"
-        message: "{{ context.job.message }}"
-        job_number: "{{ context.job.job_number }}"
-        processed_at: "{{ now() }}"
+        processed: "{{ context.processed }}"

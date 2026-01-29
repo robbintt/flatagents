@@ -13,14 +13,18 @@ Provides action handlers for:
 
 import os
 import asyncio
+import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from flatagents import (
     MachineHooks,
     SQLiteRegistrationBackend,
     SQLiteWorkBackend,
     WorkerRegistration,
+    WorkerFilter,
 )
 
 
@@ -59,7 +63,10 @@ class DistributedWorkerHooks(MachineHooks):
             "heartbeat": self._heartbeat,
             "list_stale_workers": self._list_stale_workers,
             "reap_worker": self._reap_worker,
+            "reap_stale_workers": self._reap_stale_workers,
             "echo_delay": self._echo_delay,
+            "calculate_spawn": self._calculate_spawn,
+            "spawn_workers": self._spawn_workers,
         }
         
         handler = handlers.get(action)
@@ -78,12 +85,12 @@ class DistributedWorkerHooks(MachineHooks):
         pool_id = context.get("pool_id", "default")
         
         pool = self._work.pool(pool_id)
-        workers = await self._registration.list({"status": "active"})
+        workers = await self._registration.list(WorkerFilter(status="active"))
         
-        return {
-            "queue_depth": await pool.size(),
-            "active_workers": len(workers),
-        }
+        # Merge output into context (preserve existing context keys)
+        context["queue_depth"] = await pool.size()
+        context["active_workers"] = len(workers)
+        return context
     
     # -------------------------------------------------------------------------
     # Job Actions (for job workers)
@@ -101,15 +108,12 @@ class DistributedWorkerHooks(MachineHooks):
         item = await pool.claim(worker_id)
         
         if item:
-            return {
-                "job": item.data,
-                "job_id": item.id,
-            }
+            context["job"] = item.data
+            context["job_id"] = item.id
         else:
-            return {
-                "job": None,
-                "job_id": None,
-            }
+            context["job"] = None
+            context["job_id"] = None
+        return context
     
     async def _complete_job(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Mark job as successfully completed."""
@@ -161,11 +165,11 @@ class DistributedWorkerHooks(MachineHooks):
         
         record = await self._registration.register(registration)
         
-        return {
-            "worker_id": record.worker_id,
-            "status": record.status,
-            "registered_at": record.started_at,
-        }
+        # Merge output into context
+        context["worker_id"] = record.worker_id
+        context["status"] = record.status
+        context["registered_at"] = record.started_at
+        return context
     
     async def _deregister_worker(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Mark worker as terminated (clean shutdown)."""
@@ -195,21 +199,24 @@ class DistributedWorkerHooks(MachineHooks):
         """Find workers that have missed heartbeat threshold."""
         threshold = context.get("stale_threshold_seconds", 60)
         
-        workers = await self._registration.list({
-            "status": "active",
-            "stale_threshold_seconds": threshold,
-        })
+        workers = await self._registration.list(WorkerFilter(
+            status="active",
+            stale_threshold_seconds=threshold,
+        ))
         
-        return {
-            "workers": [
-                {
-                    "worker_id": w.worker_id,
-                    "last_heartbeat": w.last_heartbeat,
-                    "host": w.host,
-                }
-                for w in workers
-            ],
-        }
+        stale_workers = [
+            {
+                "worker_id": w.worker_id,
+                "last_heartbeat": w.last_heartbeat,
+                "host": w.host,
+            }
+            for w in workers
+        ]
+        
+        # Merge into context with count for condition evaluation
+        context["workers"] = stale_workers
+        context["stale_count"] = len(stale_workers)
+        return context
     
     async def _reap_worker(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Mark worker as lost and release their claimed jobs."""
@@ -228,10 +235,38 @@ class DistributedWorkerHooks(MachineHooks):
         pool = self._work.pool(pool_id)
         released = await pool.release_by_worker(worker_id)
         
-        return {
-            "worker_id": worker_id,
-            "jobs_released": released,
-        }
+        context["reaped_worker_id"] = worker_id
+        context["jobs_released"] = released
+        return context
+    
+    async def _reap_stale_workers(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Reap all stale workers in one action (batch processing).
+        
+        This is used instead of foreach+action since that pattern isn't supported.
+        """
+        stale_workers = context.get("stale_workers", [])
+        pool_id = context.get("pool_id", "default")
+        
+        reaped = []
+        total_jobs_released = 0
+        
+        for worker in stale_workers:
+            worker_id = worker.get("worker_id")
+            
+            # Mark as lost
+            await self._registration.update_status(worker_id, "lost")
+            
+            # Release any jobs claimed by this worker
+            pool = self._work.pool(pool_id)
+            released = await pool.release_by_worker(worker_id)
+            
+            reaped.append(worker_id)
+            total_jobs_released += released
+        
+        context["reaped_workers"] = reaped
+        context["reaped_count"] = len(reaped)
+        context["total_jobs_released"] = total_jobs_released
+        return context
     
     # -------------------------------------------------------------------------
     # Echo Processor Actions
@@ -248,4 +283,62 @@ class DistributedWorkerHooks(MachineHooks):
             "processed": True,
             "delay_applied": delay,
         }
-
+    
+    # -------------------------------------------------------------------------
+    # Calculation Actions (for parallelization checker)
+    # -------------------------------------------------------------------------
+    
+    async def _calculate_spawn(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate how many workers to spawn based on pool state."""
+        queue_depth = int(context.get("queue_depth", 0))
+        active_workers = int(context.get("active_workers", 0))
+        max_workers = int(context.get("max_workers", 3))
+        
+        # Workers needed = min(queue_depth, max_workers)
+        workers_needed = min(queue_depth, max_workers)
+        
+        # Workers to spawn = max(0, workers_needed - active_workers)
+        workers_to_spawn = max(0, workers_needed - active_workers)
+        
+        return {
+            "workers_needed": workers_needed,
+            "workers_to_spawn": workers_to_spawn,
+            "spawn_list": list(range(workers_to_spawn)),  # For foreach iteration
+        }
+    
+    async def _spawn_workers(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Spawn worker subprocesses based on workers_to_spawn count.
+        
+        Uses launch_machine to spawn fire-and-forget worker processes.
+        """
+        import uuid
+        from pathlib import Path
+        from flatagents import launch_machine
+        
+        workers_to_spawn = int(context.get("workers_to_spawn", 0))
+        pool_id = context.get("pool_id", "default")
+        
+        # Path to job_worker config
+        config_dir = Path(__file__).parent.parent / "config"
+        job_worker_config = config_dir / "job_worker.yml"
+        
+        spawned_ids = []
+        for i in range(workers_to_spawn):
+            worker_id = f"worker-{uuid.uuid4().hex[:8]}"
+            
+            # Launch worker in subprocess
+            launch_machine(
+                machine_config=str(job_worker_config),
+                input_data={
+                    "pool_id": pool_id,
+                    "worker_id": worker_id,
+                },
+            )
+            
+            spawned_ids.append(worker_id)
+            logger.info(f"Spawned worker subprocess: {worker_id}")
+        
+        return {
+            "spawned_ids": spawned_ids,
+            "spawned_count": len(spawned_ids),
+        }

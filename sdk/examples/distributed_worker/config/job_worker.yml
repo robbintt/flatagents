@@ -9,15 +9,14 @@ data:
   
   context:
     pool_id: "{{ input.pool_id | default('default') }}"
-    worker_id: "{{ input.worker_id }}"
+    worker_id: "{{ input.worker_id | default('unknown') }}"
   
   hooks:
     file: "../python/hooks.py"
     class: "DistributedWorkerHooks"
   
   machines:
-    echo_processor:
-      file: "./echo_processor.yml"
+    echo_processor: ./echo_processor.yml
   
   states:
     start:

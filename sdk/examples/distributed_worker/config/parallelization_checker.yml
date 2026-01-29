@@ -12,6 +12,9 @@ data:
     file: "../python/hooks.py"
     class: "DistributedWorkerHooks"
   
+  machines:
+    job_worker: ./job_worker.yml
+  
   states:
     start:
       type: initial
@@ -27,25 +30,20 @@ data:
         - to: calculate_spawn
     
     calculate_spawn:
-      # Calculate how many workers to spawn:
-      # - Can't exceed max_workers total
-      # - Need workers for pending jobs
-      # - Don't spawn more than queue depth
+      action: calculate_spawn
       output_to_context:
-        workers_needed: "{{ [context.queue_depth, context.max_workers] | min }}"
-        workers_to_spawn: "{{ [[context.queue_depth, context.max_workers] | min - context.active_workers, 0] | max }}"
+        workers_needed: "{{ output.workers_needed }}"
+        workers_to_spawn: "{{ output.workers_to_spawn }}"
       transitions:
         - condition: "context.workers_to_spawn > 0"
           to: spawn_workers
         - to: done
     
     spawn_workers:
-      # Fire-and-forget spawn of worker machines
-      foreach: "{{ range(context.workers_to_spawn | int) }}"
-      as: worker_index
-      launch: job_worker
-      launch_input:
-        pool_id: "{{ context.pool_id }}"
+      # Use action-based spawning (hook handles subprocess launch)
+      action: spawn_workers
+      output_to_context:
+        spawned_ids: "{{ output.spawned_ids }}"
       transitions:
         - to: done
     
@@ -53,5 +51,6 @@ data:
       type: final
       output:
         spawned: "{{ context.workers_to_spawn | default(0) }}"
+        spawned_ids: "{{ context.spawned_ids | default([]) }}"
         queue_depth: "{{ context.queue_depth }}"
         active_workers: "{{ context.active_workers }}"
