@@ -95,6 +95,7 @@ from .distributed import (
     create_registration_backend,
     create_work_backend,
 )
+from .distributed_hooks import DistributedWorkerHooks
 
 __all__ = [
     "__version__",
@@ -181,4 +182,6 @@ __all__ = [
     # Subprocess execution (v0.9.0)
     "SubprocessInvoker",
     "launch_machine",
+    # Distributed hooks (v0.9.0)
+    "DistributedWorkerHooks",
 ]
