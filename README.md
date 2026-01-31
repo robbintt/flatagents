@@ -47,6 +47,7 @@ Use FlatAgent alone for simple tasks. Use FlatMachine when you need multi-step w
 | [research_paper_analysis](./sdk/examples/research_paper_analysis/python) | Document analysis with structured extraction |
 | [multi_paper_synthesizer](./sdk/examples/multi_paper_synthesizer/python) | Cross-document synthesis with dynamic machine launching |
 | [support_triage_json](./sdk/examples/support_triage_json/python) | JSON input/output with classification pipeline |
+| [distributed_worker](./sdk/examples/distributed_worker/python) | Worker pool with registration + work backends, scaling, stale worker reaping |
 | [parallelism](./sdk/examples/parallelism/python) | Parallel machines, dynamic foreach, fire-and-forget launches |
 
 ## Quick Start
@@ -178,6 +179,17 @@ result = await machine.execute(input={"query": "..."})
 
 FlatMachine provides: state transitions, conditional branching, loops, retry with backoff, and error recovery—all in YAML.
 
+## Distributed Worker Pattern
+
+FlatAgents includes `DistributedWorkerHooks` plus `RegistrationBackend`/`WorkBackend` implementations (SQLite in the reference SDK) to build worker pools.
+
+Typical topology:
+- **Checker**: `get_pool_state` → `calculate_spawn` → `spawn_workers` (requires `worker_config_path` in context or override in hooks)
+- **Worker**: `register_worker` → `claim_job` → process → `complete_job`/`fail_job` → `deregister_worker`
+- **Reaper**: `list_stale_workers` → `reap_stale_workers`
+
+See [distributed_worker](./sdk/examples/distributed_worker/python) for a runnable demo.
+
 ## Features
 
 - Checkpoint and restore
@@ -191,10 +203,11 @@ FlatMachine provides: state transitions, conditional branching, loops, retry wit
 - Parallel machine execution (`machine: [a, b, c]`)
 - Dynamic parallelism with `foreach`
 - Fire-and-forget launches for background tasks
+- Distributed worker orchestration (registration/work backends, scaling hooks, stale worker reaping)
 
 ## Planned
 
-- Distributed execution — cross-network machine peering, inter-machine strategies
+- Distributed execution backends (Redis/Postgres) + cross-network peering strategies
 - SQL persistence backend
 - TypeScript SDK
 - `max_depth` config to limit machine launch nesting
