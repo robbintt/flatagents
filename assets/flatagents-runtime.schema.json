@@ -11,7 +11,7 @@
         },
         "spec_version": {
           "type": "string",
-          "const": "0.8.3"
+          "const": "0.9.0"
         },
         "execution_lock": {
           "$ref": "#/definitions/ExecutionLock"
@@ -39,6 +39,12 @@
         },
         "machine_snapshot": {
           "$ref": "#/definitions/MachineSnapshot"
+        },
+        "registration_backend": {
+          "$ref": "#/definitions/RegistrationBackend"
+        },
+        "work_backend": {
+          "$ref": "#/definitions/WorkBackend"
         }
       },
       "required": [
@@ -51,7 +57,7 @@
     "ExecutionLock": {
       "type": "object",
       "additionalProperties": false,
-      "description": "FlatAgents Runtime Interface Spec ==================================\n\nThis file defines the runtime interfaces that SDKs MUST implement to be considered compliant. These are NOT configuration schemas (see flatagent.d.ts and flatmachine.d.ts for those).\n\nREQUIRED IMPLEMENTATIONS:\n-------------------------   - ExecutionLock: NoOpLock (MUST), LocalFileLock (SHOULD)   - PersistenceBackend: MemoryBackend (MUST), LocalFileBackend (SHOULD)   - ResultBackend: InMemoryResultBackend (MUST)   - ExecutionType: Default, Retry, Parallel, MDAPVoting (MUST)   - MachineHooks: Base interface (MUST)\n\nOPTIONAL IMPLEMENTATIONS:\n-------------------------   - Distributed backends (Redis, Postgres, etc.)   - LLMBackend (SDK may use native provider SDKs)\n\nEXECUTION LOCKING:\n------------------ Prevents concurrent execution of the same machine instance.\n\nSDKs MUST provide:   - NoOpLock: For when locking is handled externally or disabled\n\nSDKs SHOULD provide:   - LocalFileLock: For single-node deployments using fcntl/flock\n\nDistributed deployments should implement Redis/Consul/etcd locks.\n\nPERSISTENCE BACKEND:\n-------------------- Storage backend for machine checkpoints.\n\nSDKs MUST provide:   - MemoryBackend: For testing and ephemeral runs\n\nSDKs SHOULD provide:   - LocalFileBackend: For durable local storage with atomic writes\n\nRESULT BACKEND:\n--------------- Inter-machine communication via URI-addressed results.\n\nURI format: flatagents://{execution_id}/{path}   - path is typically \"result\" or \"checkpoint\"\n\nSDKs MUST provide:   - InMemoryResultBackend: For single-process execution\n\nEXECUTION TYPES:\n---------------- Execution strategy for agent calls.\n\nSDKs MUST implement all four types:   - default: Single call, no retry   - retry: Configurable backoffs with jitter   - parallel: Run N samples, return all successes   - mdap_voting: Multi-sample with consensus voting\n\nMACHINE HOOKS:\n-------------- Extension points for machine execution. All methods are optional and can be sync or async.\n\nSDKs SHOULD provide:   - WebhookHooks: Send events to HTTP endpoint   - CompositeHooks: Combine multiple hook implementations\n\nLLM BACKEND (OPTIONAL):\n----------------------- Abstraction over LLM providers.\n\nThis interface is OPTIONAL - SDKs may use provider SDKs directly. Useful for:   - Unified retry/monitoring across providers   - Provider-agnostic code   - Testing with mock backends\n\nMACHINE INVOKER:\n---------------- Interface for invoking peer machines. Used internally by FlatMachine for `machine:` and `launch:` states.\n\nBACKEND CONFIGURATION:\n---------------------- Backend configuration for machine settings.\n\nExample in YAML:   settings:     backends:       persistence: local       locking: none       results: memory"
+      "description": "FlatAgents Runtime Interface Spec ==================================\n\nThis file defines the runtime interfaces that SDKs MUST implement to be considered compliant. These are NOT configuration schemas (see flatagent.d.ts and flatmachine.d.ts for those).\n\nREQUIRED IMPLEMENTATIONS:\n-------------------------   - ExecutionLock: NoOpLock (MUST), LocalFileLock (SHOULD)   - PersistenceBackend: MemoryBackend (MUST), LocalFileBackend (SHOULD)   - ResultBackend: InMemoryResultBackend (MUST)   - ExecutionType: Default, Retry, Parallel, MDAPVoting (MUST)   - MachineHooks: Base interface (MUST)   - RegistrationBackend: SQLiteRegistrationBackend (MUST), MemoryRegistrationBackend (SHOULD)   - WorkBackend: SQLiteWorkBackend (MUST), MemoryWorkBackend (SHOULD)\n\nOPTIONAL IMPLEMENTATIONS:\n-------------------------   - Distributed backends (Redis, Postgres, etc.)   - LLMBackend (SDK may use native provider SDKs)\n\nEXECUTION LOCKING:\n------------------ Prevents concurrent execution of the same machine instance.\n\nSDKs MUST provide:   - NoOpLock: For when locking is handled externally or disabled\n\nSDKs SHOULD provide:   - LocalFileLock: For single-node deployments using fcntl/flock\n\nDistributed deployments should implement Redis/Consul/etcd locks.\n\nPERSISTENCE BACKEND:\n-------------------- Storage backend for machine checkpoints.\n\nSDKs MUST provide:   - MemoryBackend: For testing and ephemeral runs\n\nSDKs SHOULD provide:   - LocalFileBackend: For durable local storage with atomic writes\n\nRESULT BACKEND:\n--------------- Inter-machine communication via URI-addressed results.\n\nURI format: flatagents://{execution_id}/{path}   - path is typically \"result\" or \"checkpoint\"\n\nSDKs MUST provide:   - InMemoryResultBackend: For single-process execution\n\nEXECUTION TYPES:\n---------------- Execution strategy for agent calls.\n\nSDKs MUST implement all four types:   - default: Single call, no retry   - retry: Configurable backoffs with jitter   - parallel: Run N samples, return all successes   - mdap_voting: Multi-sample with consensus voting\n\nMACHINE HOOKS:\n-------------- Extension points for machine execution. All methods are optional and can be sync or async.\n\nSDKs SHOULD provide:   - WebhookHooks: Send events to HTTP endpoint   - CompositeHooks: Combine multiple hook implementations\n\nLLM BACKEND (OPTIONAL):\n----------------------- Abstraction over LLM providers.\n\nThis interface is OPTIONAL - SDKs may use provider SDKs directly. Useful for:   - Unified retry/monitoring across providers   - Provider-agnostic code   - Testing with mock backends\n\nMACHINE INVOKER:\n---------------- Interface for invoking peer machines. Used internally by FlatMachine for `machine:` and `launch:` states.\n\nBACKEND CONFIGURATION:\n---------------------- Backend configuration for machine settings.\n\nExample in YAML:   settings:     backends:       persistence: local       locking: none       results: memory"
     },
     "PersistenceBackend": {
       "type": "object",
@@ -154,6 +160,28 @@
             "redis"
           ],
           "description": "Inter-machine results. Default: memory"
+        },
+        "registration": {
+          "type": "string",
+          "enum": [
+            "memory",
+            "sqlite",
+            "redis"
+          ],
+          "description": "Worker registration. Default: memory"
+        },
+        "work": {
+          "type": "string",
+          "enum": [
+            "memory",
+            "sqlite",
+            "redis"
+          ],
+          "description": "Work pool. Default: memory"
+        },
+        "sqlite_path": {
+          "type": "string",
+          "description": "Path for sqlite backends (registration and work share this)"
         }
       },
       "additionalProperties": false
@@ -238,6 +266,16 @@
         "launched"
       ],
       "additionalProperties": false
+    },
+    "RegistrationBackend": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "REGISTRATION BACKEND:\n--------------------- Worker lifecycle management for distributed execution.\n\nSDKs MUST provide:   - SQLiteRegistrationBackend: For local deployments\n\nSDKs SHOULD provide:   - MemoryRegistrationBackend: For testing\n\nImplementation notes:   - Time units: Python reference SDK uses seconds for all interval values   - Stale threshold: SDKs SHOULD default to 2× heartbeat_interval if not specified"
+    },
+    "WorkBackend": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "WORK BACKEND:\n------------- Work distribution via named pools with atomic claim.\n\nSDKs MUST provide:   - SQLiteWorkBackend: For local deployments\n\nSDKs SHOULD provide:   - MemoryWorkBackend: For testing\n\nImplementation notes:   - Atomic claim: SDKs MUST ensure no two workers can claim the same job   - Test requirements: Include concurrent claim race condition tests"
     }
   }
 }

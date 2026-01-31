@@ -102,12 +102,62 @@ export interface LaunchIntent {
     input: Record<string, any>;
     launched: boolean;
 }
+export interface RegistrationBackend {
+    register(worker: WorkerRegistration): Promise<WorkerRecord>;
+    heartbeat(worker_id: string, metadata?: Record<string, any>): Promise<void>;
+    updateStatus(worker_id: string, status: string): Promise<void>;
+    get(worker_id: string): Promise<WorkerRecord | null>;
+    list(filter?: WorkerFilter): Promise<WorkerRecord[]>;
+}
+export interface WorkerRegistration {
+    worker_id: string;
+    host?: string;
+    pid?: number;
+    capabilities?: string[];
+    pool_id?: string;
+    started_at: string;
+}
+export interface WorkerRecord extends WorkerRegistration {
+    status: string;
+    last_heartbeat: string;
+    current_task_id?: string;
+}
+export interface WorkerFilter {
+    status?: string | string[];
+    capability?: string;
+    pool_id?: string;
+    stale_threshold_seconds?: number;
+}
+export interface WorkBackend {
+    pool(name: string): WorkPool;
+}
+export interface WorkPool {
+    push(item: any, options?: {
+        max_retries?: number;
+    }): Promise<string>;
+    claim(worker_id: string): Promise<WorkItem | null>;
+    complete(item_id: string, result?: any): Promise<void>;
+    fail(item_id: string, error?: string): Promise<void>;
+    size(): Promise<number>;
+    releaseByWorker(worker_id: string): Promise<number>;
+}
+export interface WorkItem {
+    id: string;
+    data: any;
+    claimed_by?: string;
+    claimed_at?: string;
+    attempts: number;
+    max_retries: number;
+}
 export interface BackendConfig {
     persistence?: "memory" | "local" | "redis" | "postgres" | "s3";
     locking?: "none" | "local" | "redis" | "consul";
     results?: "memory" | "redis";
+    registration?: "memory" | "sqlite" | "redis";
+    work?: "memory" | "sqlite" | "redis";
+    sqlite_path?: string;
 }
-export const SPEC_VERSION = "0.8.3";
+export const SPEC_VERSION = "0.9.0";
 export interface SDKRuntimeWrapper {
     spec: "flatagents-runtime";
     spec_version: typeof SPEC_VERSION;
@@ -120,4 +170,6 @@ export interface SDKRuntimeWrapper {
     machine_invoker?: MachineInvoker;
     backend_config?: BackendConfig;
     machine_snapshot?: MachineSnapshot;
+    registration_backend?: RegistrationBackend;
+    work_backend?: WorkBackend;
 }

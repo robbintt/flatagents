@@ -1,4 +1,4 @@
-export const SPEC_VERSION = "0.8.3";
+export const SPEC_VERSION = "0.9.0";
 export interface AgentWrapper {
     spec: "flatagent";
     spec_version: string;

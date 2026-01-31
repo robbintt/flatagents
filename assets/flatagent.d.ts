@@ -149,7 +149,7 @@
  * The profile field specifies which profile name to use as base.
  */
 
-export const SPEC_VERSION = "0.8.3";
+export const SPEC_VERSION = "0.9.0";
 
 export interface AgentWrapper {
   spec: "flatagent";

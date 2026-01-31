@@ -2,7 +2,7 @@
 # Summarizes multiple texts into a concise summary
 
 spec: flatagent
-spec_version: "0.8.0"
+spec_version: "0.9.0"
 
 data:
   name: summarizer-agent

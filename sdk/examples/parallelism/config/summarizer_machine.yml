@@ -2,7 +2,7 @@
 # Wrapper for text summarization agent
 
 spec: flatmachine
-spec_version: "0.8.0"
+spec_version: "0.9.0"
 
 data:
   name: summarizer-machine
