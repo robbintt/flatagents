@@ -87,6 +87,79 @@ def start_goal(goal: str, db_path: str):
     print(f"   Goal: {goal}")
     print(f"   Run './run.sh observe' to approve transitions")
 
+def resolve_session_id(db_path: str, session_id: str) -> str | None:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT session_id FROM sessions WHERE session_id = ? OR session_id LIKE ? ORDER BY created_at DESC",
+        (session_id, f"{session_id}%")
+    )
+    rows = [r["session_id"] for r in cursor.fetchall()]
+    conn.close()
+
+    if not rows:
+        print(f"❌ No session matches '{session_id}'.")
+        return None
+
+    if session_id in rows:
+        return session_id
+
+    if len(rows) > 1:
+        matches = ", ".join(r[:8] for r in rows[:5])
+        suffix = "..." if len(rows) > 5 else ""
+        print(f"❌ Session id '{session_id}' is ambiguous: {matches}{suffix}")
+        return None
+
+    return rows[0]
+
+def resume_session(session_id: str, db_path: str) -> str | None:
+    resolved = resolve_session_id(db_path, session_id)
+    if not resolved:
+        return None
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT execution_id, status FROM executions WHERE session_id = ? AND status != 'terminated' ORDER BY created_at DESC LIMIT 1",
+        (resolved,)
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        cursor = conn.execute(
+            "SELECT execution_id, status FROM executions WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+            (resolved,)
+        )
+        last = cursor.fetchone()
+        conn.close()
+        if last:
+            print(f"ℹ️  Session {resolved[:8]}... already completed (last execution terminated).")
+        else:
+            print(f"❌ No executions found for session {resolved[:8]}...")
+        return None
+
+    execution_id = row["execution_id"]
+    status = row["status"]
+    now = datetime.now().isoformat()
+
+    if status in ("suspended", "running"):
+        conn.execute("UPDATE executions SET status = 'pending' WHERE execution_id = ?", (execution_id,))
+        action = "requeued"
+    elif status == "pending":
+        action = "already pending"
+    else:
+        action = f"status={status}"
+
+    conn.execute(
+        "UPDATE sessions SET status = 'active', updated_at = ? WHERE session_id = ?",
+        (now, resolved)
+    )
+    conn.commit()
+    conn.close()
+
+    print(f"▶️  Session {resolved[:8]}... {action}")
+    return resolved
+
 def list_sessions(db_path: str):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -98,10 +171,10 @@ def list_sessions(db_path: str):
         print("No sessions yet.")
         return
     
-    print(f"{'Session':<12} {'Status':<10} {'Goal'}")
+    print(f"{'Session':<40} {'Status':<20} {'Goal'}")
     print("-" * 60)
     for r in rows:
-        print(f"{r['session_id'][:10]}.. {r['status']:<10} {r['goal'][:40]}")
+        print(f"{r['session_id']:<40}.. {r['status']:<20} {r['goal'][:40]}")
 
 def main():
     parser = argparse.ArgumentParser(description="Anything Agent")
@@ -120,7 +193,10 @@ def main():
     elif args.command == "resume":
         if not args.session:
             parser.error("--session required")
-        print(f"Resuming {args.session}...")
+        from .observer import run_loop
+        resolved = resume_session(args.session, args.db)
+        if resolved:
+            asyncio.run(run_loop(args.db, resolved))
     elif args.command == "list":
         list_sessions(args.db)
     elif args.command == "observe":
