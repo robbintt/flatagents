@@ -1,0 +1,17 @@
+[project]
+name = "anything_agent"
+version = "0.1.0"
+description = "Autonomous agent with human oversight and inverted control"
+dependencies = [
+    "flatagents[litellm]",
+    "prompt-toolkit>=3.0.0",
+    "tiktoken>=0.5.0",
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+anything-agent = "anything_agent.main:main"

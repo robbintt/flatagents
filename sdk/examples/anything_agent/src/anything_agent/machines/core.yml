@@ -1,0 +1,103 @@
+spec: flatmachine
+spec_version: "0.9.0"
+
+data:
+  name: core
+  
+  context:
+    session_id: "{{ input.session_id }}"
+    db_path: "{{ input.db_path }}"
+    model_token_limit: 200000
+    context_target_pct: 0.20
+    context_minimum: 12000
+    leaf_result: "{{ input.leaf_result | default('') }}"
+    has_leaf_result: false
+  
+  agents:
+    thinker: ./agents/thinker.yml
+    worker: ./agents/worker.yml
+    reflector: ./agents/reflector.yml
+  
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: load_context
+
+    load_context:
+      action: load_context
+      transitions:
+        - condition: "context.has_leaf_result == true"
+          to: process_leaf
+        - to: think
+
+    process_leaf:
+      agent: reflector
+      input:
+        leaf_result: "{{ context.leaf_result }}"
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
+      output_to_context:
+        ledger_update: "{{ output.ledger_update }}"
+      transitions:
+        - to: cleanup
+    
+    think:
+      agent: thinker
+      input:
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
+        token_budget: "{{ context.token_budget }}"
+      output_to_context:
+        next_action: "{{ output.action }}"
+        action_detail: "{{ output.detail }}"
+        ledger_update: "{{ output.ledger_update | default({}) }}"
+      transitions:
+        - condition: "context.next_action == 'done'"
+          to: save_and_done
+        - to: work
+
+    work:
+      agent: worker
+      input:
+        task: "{{ context.action_detail }}"
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
+      output_to_context:
+        work_result: "{{ output.result }}"
+        work_success: "{{ output.success }}"
+      transitions:
+        - to: cleanup
+
+    cleanup:
+      action: cleanup_context
+      transitions:
+        - to: reflect
+
+    reflect:
+      agent: reflector
+      input:
+        work_result: "{{ context.work_result }}"
+        work_success: "{{ context.work_success }}"
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
+      output_to_context:
+        ledger_update: "{{ output.ledger_update }}"
+      transitions:
+        - to: save_ledger
+
+    save_ledger:
+      action: save_ledger
+      transitions:
+        - to: load_context
+
+    save_and_done:
+      action: save_ledger
+      transitions:
+        - to: done
+
+    done:
+      type: final
+      output:
+        status: "completed"
+        goal: "{{ context.ledger.goal }}"
