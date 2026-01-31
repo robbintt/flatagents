@@ -169,8 +169,17 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
     echo "DRY RUN complete. Run with --apply to publish to npm."
 else
+    if [ -z "$NPMJS_TOKEN_MEMGRAFTER" ]; then
+        echo "RELEASE ABORTED: NPMJS_TOKEN_MEMGRAFTER is not set."
+        echo "Set NPMJS_TOKEN_MEMGRAFTER to an npm automation token before publishing."
+        exit 1
+    fi
+
     echo "Publishing to npm..."
-    npm publish
+    NPMRC_TMP="$(mktemp)"
+    trap 'rm -f "$NPMRC_TMP"' EXIT
+    echo "//registry.npmjs.org/:_authToken=${NPMJS_TOKEN_MEMGRAFTER}" > "$NPMRC_TMP"
+    NPM_CONFIG_USERCONFIG="$NPMRC_TMP" npm publish
     echo ""
     echo "Released flatagents@$PACKAGE_VERSION to npm"
 fi
