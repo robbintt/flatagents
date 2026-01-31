@@ -28,17 +28,19 @@ class AnythingAgentHooks(MachineHooks):
         
         # Check if this exact transition was already approved
         cursor = conn.execute(
-            "SELECT status FROM pending_approvals WHERE execution_id = ? AND state_name = ? AND proposed_transition = ? ORDER BY id DESC LIMIT 1",
+            "SELECT id, status FROM pending_approvals WHERE execution_id = ? AND state_name = ? AND proposed_transition = ? ORDER BY id DESC LIMIT 1",
             (self.execution_id, from_state, to_state)
         )
         row = cursor.fetchone()
         
-        if row and row[0] == 'approved':
-            # Already approved, continue
+        if row and row[1] == 'approved':
+            # Consume approval so loops require fresh approval next time
+            conn.execute("UPDATE pending_approvals SET status = 'consumed' WHERE id = ?", (row[0],))
+            conn.commit()
             conn.close()
             return to_state
         
-        if row and row[0] == 'pending':
+        if row and row[1] == 'pending':
             # Already pending, just wait
             conn.close()
             raise AwaitingApproval(self.execution_id, from_state, to_state)

@@ -26,10 +26,28 @@ uv pip install --python .venv/bin/python -e "$PYTHON_SDK_PATH[litellm]" -e . pro
 
 case ${1:-observe} in
     run)
-        .venv/bin/python -m anything_agent.main run --goal "$2"
+        shift
+        if [[ "$1" == "--goal" || "$1" == "-g" ]]; then
+            shift
+        fi
+        goal="$*"
+        if [[ -z "$goal" ]]; then
+            echo "Usage: ./run.sh run \"goal\""
+            exit 1
+        fi
+        .venv/bin/python -m anything_agent.main run --goal "$goal"
         ;;
     resume)
-        .venv/bin/python -m anything_agent.main resume --session "$2"
+        shift
+        if [[ "$1" == "--session" || "$1" == "-s" ]]; then
+            shift
+        fi
+        session_id="$1"
+        if [[ -z "$session_id" ]]; then
+            echo "Usage: ./run.sh resume <session>"
+            exit 1
+        fi
+        .venv/bin/python -m anything_agent.main resume --session "$session_id"
         ;;
     list)
         .venv/bin/python -m anything_agent.main list
@@ -42,6 +60,14 @@ case ${1:-observe} in
             "SELECT substr(session_id,1,8) as id, status, substr(goal,1,40) as goal FROM sessions ORDER BY created_at DESC LIMIT 5" 2>/dev/null || echo "No database yet"
         ;;
     *)
-        echo "Usage: ./run.sh [run 'goal'|resume <session>|list|observe|status]"
+        goal="$*"
+        if [[ -n "$goal" ]]; then
+            .venv/bin/python -m anything_agent.main run --goal "$goal"
+            exit 0
+        fi
+        echo "Usage: ./run.sh run \"goal\""
+        echo "       ./run.sh \"goal\"        # shorthand"
+        echo "       ./run.sh resume <session>"
+        echo "       ./run.sh list | observe | status"
         ;;
 esac

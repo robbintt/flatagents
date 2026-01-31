@@ -117,14 +117,29 @@ async def run_execution(row: dict, db_path: str):
     # Use file path for proper relative path resolution
     machine_path = Path(__file__).parent / "machines" / "core.yml"
     profiles_path = Path(__file__).parent.parent.parent / "config" / "profiles.yml"
-    machine = FlatMachine(config_file=str(machine_path), hooks=hooks, profiles_file=str(profiles_path))
-    
-    try:
-        # If we have a snapshot with context, use it as input
-        input_data = {"session_id": session_id, "db_path": db_path}
+
+    machine = None
+    input_data = {"session_id": session_id, "db_path": db_path}
+
+    if snapshot and snapshot.get("state") and snapshot.get("context"):
+        machine_yaml = row.get("machine_yaml")
+        if not machine_yaml:
+            machine_yaml = machine_path.read_text()
+        machine_config = yaml.safe_load(machine_yaml) or {}
+        machine_config = _apply_snapshot(machine_config, snapshot)
+        machine = FlatMachine(
+            config_dict=machine_config,
+            hooks=hooks,
+            profiles_file=str(profiles_path),
+            _config_dir=str(machine_path.parent),
+        )
+        input_data = {}
+    else:
+        machine = FlatMachine(config_file=str(machine_path), hooks=hooks, profiles_file=str(profiles_path))
         if snapshot and 'context' in snapshot:
             input_data.update(snapshot['context'])
-        
+    
+    try:
         result = await machine.execute(input=input_data)
         print(f"✅ Complete: {result}")
         conn = sqlite3.connect(db_path)
@@ -133,6 +148,23 @@ async def run_execution(row: dict, db_path: str):
         conn.close()
     except AwaitingApproval as e:
         print(f"⏸️  Paused: {e.from_state} → {e.to_state}")
+
+def _apply_snapshot(machine_config: dict, snapshot: dict) -> dict:
+    data = machine_config.get("data", {})
+    states = data.get("states", {})
+    target_state = snapshot.get("state")
+
+    if target_state and target_state in states:
+        for state_name, state in states.items():
+            if state.get("type") == "initial":
+                state.pop("type", None)
+        states[target_state]["type"] = "initial"
+    else:
+        print(f"⚠️  Snapshot state '{target_state}' not found. Starting from default initial state.")
+
+    data["context"] = snapshot.get("context", {})
+    machine_config["data"] = data
+    return machine_config
 
 def display_approval(approval: dict, db_path: str):
     print(f"\n{'═' * 60}")
@@ -175,6 +207,13 @@ def display_approval(approval: dict, db_path: str):
 
         print("\n✅ To state definition:")
         print(yaml.safe_dump(to_state or {"missing": True}, sort_keys=False).strip())
+
+    session_id = approval.get("session_id")
+    if session_id:
+        ledger = fetch_ledger(db_path, session_id)
+        if ledger:
+            print("\n🧾 Ledger (db):")
+            print(yaml.safe_dump(ledger, sort_keys=False).strip())
 
     print("\n📦 Context snapshot:")
     print(json.dumps(context, indent=2, sort_keys=True))
@@ -230,6 +269,27 @@ def stop(db_path: str, approval_id: int):
     conn.execute("UPDATE executions SET status = 'suspended' WHERE execution_id = ?", (exec_id,))
     conn.commit()
     conn.close()
+
+def fetch_ledger(db_path: str, session_id: str) -> dict | None:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "SELECT goal, progress, techniques, failed_approaches, human_notes FROM ledger WHERE session_id = ?",
+        (session_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "goal": row["goal"],
+        "progress": json.loads(row["progress"] or "[]"),
+        "techniques": json.loads(row["techniques"] or "[]"),
+        "failed_approaches": json.loads(row["failed_approaches"] or "[]"),
+        "human_notes": json.loads(row["human_notes"] or "[]"),
+    }
 
 def get_stopped_approvals(db_path: str, session_id: str | None = None) -> list:
     conn = sqlite3.connect(db_path)
