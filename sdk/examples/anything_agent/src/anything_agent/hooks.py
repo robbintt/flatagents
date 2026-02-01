@@ -2,6 +2,10 @@
 import sqlite3
 import json
 import uuid
+import subprocess
+import io
+import contextlib
+import traceback
 from datetime import datetime
 from typing import Dict, Any
 from flatagents import MachineHooks
@@ -42,6 +46,11 @@ class AnythingAgentHooks(MachineHooks):
         
         if row and row[1] == 'pending':
             # Already pending, just wait
+            conn.execute(
+                "UPDATE executions SET status = 'suspended' WHERE execution_id = ?",
+                (self.execution_id,)
+            )
+            conn.commit()
             conn.close()
             raise AwaitingApproval(self.execution_id, from_state, to_state)
         
@@ -62,6 +71,10 @@ class AnythingAgentHooks(MachineHooks):
             "INSERT INTO pending_approvals (execution_id, session_id, state_name, context_json, proposed_transition, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
             (self.execution_id, self.session_id, from_state, json.dumps(ctx_copy), to_state, now)
         )
+        conn.execute(
+            "UPDATE executions SET status = 'suspended' WHERE execution_id = ?",
+            (self.execution_id,)
+        )
         conn.commit()
         conn.close()
         raise AwaitingApproval(self.execution_id, from_state, to_state)
@@ -73,6 +86,10 @@ class AnythingAgentHooks(MachineHooks):
             return self._cleanup_context(context)
         elif action_name == "save_ledger":
             return self._save_ledger(context)
+        elif action_name == "run_shell":
+            return self._run_shell(context)
+        elif action_name == "run_python":
+            return self._run_python(context)
         return context
     
     def _load_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -140,4 +157,59 @@ class AnythingAgentHooks(MachineHooks):
         conn.commit()
         conn.close()
         context["ledger_update"] = {}
+        return context
+
+    def _run_shell(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Run a shell command from context.shell_command or context.command."""
+        command = context.get("shell_command") or context.get("command")
+        if not command:
+            context["shell_success"] = False
+            context["shell_error"] = "shell_command missing"
+            return context
+
+        try:
+            if isinstance(command, list):
+                cmd = command
+                shell = False
+            else:
+                cmd = command
+                shell = True
+            result = subprocess.run(
+                cmd,
+                shell=shell,
+                text=True,
+                capture_output=True,
+            )
+            context["shell_stdout"] = result.stdout
+            context["shell_stderr"] = result.stderr
+            context["shell_exit_code"] = result.returncode
+            context["shell_success"] = result.returncode == 0
+        except Exception as exc:
+            context["shell_success"] = False
+            context["shell_error"] = str(exc)
+        return context
+
+    def _run_python(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute python code from context.python_code or context.code."""
+        code = context.get("python_code") or context.get("code")
+        if not code:
+            context["python_success"] = False
+            context["python_error"] = "python_code missing"
+            return context
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        namespace: Dict[str, Any] = {}
+        try:
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                exec(code, namespace, namespace)
+            context["python_success"] = True
+            context["python_stdout"] = stdout.getvalue()
+            context["python_stderr"] = stderr.getvalue()
+            context["python_result"] = namespace.get("result")
+        except Exception:
+            context["python_success"] = False
+            context["python_stdout"] = stdout.getvalue()
+            context["python_stderr"] = stderr.getvalue()
+            context["python_error"] = traceback.format_exc()
         return context

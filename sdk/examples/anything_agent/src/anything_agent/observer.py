@@ -2,15 +2,15 @@
 import sqlite3
 import json
 import asyncio
+import subprocess
+import sys
 from datetime import datetime
-from pathlib import Path
 
 import yaml
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 
-from flatagents import FlatMachine
-from .hooks import AnythingAgentHooks, AwaitingApproval
+from .execution import load_machine_config
 
 session = PromptSession()
 
@@ -30,8 +30,8 @@ async def run_loop(db_path: str, session_id: str | None = None):
         if not pending:
             pending_exec = get_pending_execution(db_path, session_id)
             if pending_exec:
-                print(f"\n⏳ Starting {pending_exec['execution_id'][:8]}...")
-                await run_execution(pending_exec, db_path)
+                if launch_execution(db_path, pending_exec["execution_id"]):
+                    print(f"\n🚀 Launched {pending_exec['execution_id'][:8]}...")
                 continue
 
             try:
@@ -75,14 +75,12 @@ async def run_loop(db_path: str, session_id: str | None = None):
         response = response.strip().lower()
         
         if response in ('a', 'approve', ''):
-            approve(db_path, approval['id'], approval['session_id'])
-            print("✅ Approved")
-            await restore_and_continue(approval, db_path)
+            approve(db_path, approval['id'], approval['session_id'], approval['execution_id'])
+            print("✅ Approved (queued)")
         elif response in ('n', 'note'):
             note = await session.prompt_async(HTML('<b>Note: </b>'))
-            approve(db_path, approval['id'], approval['session_id'], note.strip())
-            print(f"✅ Approved with note")
-            await restore_and_continue(approval, db_path)
+            approve(db_path, approval['id'], approval['session_id'], approval['execution_id'], note.strip())
+            print("✅ Approved with note (queued)")
         elif response in ('s', 'stop'):
             stop(db_path, approval['id'])
             print("🛑 Stopped")
@@ -90,81 +88,42 @@ async def run_loop(db_path: str, session_id: str | None = None):
             print("👋 Goodbye")
             break
 
-async def restore_and_continue(approval: dict, db_path: str):
-    """Restore from snapshot and continue."""
+def launch_execution(db_path: str, execution_id: str) -> bool:
+    """Launch an execution in a detached subprocess."""
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.execute("SELECT * FROM executions WHERE execution_id = ?", (approval['execution_id'],))
+    cursor = conn.execute(
+        "SELECT status FROM executions WHERE execution_id = ?",
+        (execution_id,)
+    )
     row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        await run_execution(dict(row), db_path)
+    if not row or row[0] != "pending":
+        conn.close()
+        return False
 
-async def run_execution(row: dict, db_path: str):
-    """Run machine from execution row."""
-    execution_id = row['execution_id']
-    session_id = row['session_id']
-    snapshot = json.loads(row['snapshot']) if row.get('snapshot') else None
-    
-    conn = sqlite3.connect(db_path)
-    conn.execute("UPDATE executions SET status = 'running' WHERE execution_id = ?", (execution_id,))
+    conn.execute(
+        "UPDATE executions SET status = 'running' WHERE execution_id = ?",
+        (execution_id,)
+    )
     conn.commit()
     conn.close()
-    
-    hooks = AnythingAgentHooks(db_path, session_id, execution_id)
-    
-    # Use file path for proper relative path resolution
-    machine_path = Path(__file__).parent / "machines" / "core.yml"
-    profiles_path = Path(__file__).parent.parent.parent / "config" / "profiles.yml"
 
-    machine = None
-    input_data = {"session_id": session_id, "db_path": db_path}
+    cmd = [
+        sys.executable,
+        "-m",
+        "anything_agent.runner",
+        "--db",
+        db_path,
+        "--execution-id",
+        execution_id,
+    ]
 
-    if snapshot and snapshot.get("state") and snapshot.get("context"):
-        machine_yaml = row.get("machine_yaml")
-        if not machine_yaml:
-            machine_yaml = machine_path.read_text()
-        machine_config = yaml.safe_load(machine_yaml) or {}
-        machine_config = _apply_snapshot(machine_config, snapshot)
-        machine = FlatMachine(
-            config_dict=machine_config,
-            hooks=hooks,
-            profiles_file=str(profiles_path),
-            _config_dir=str(machine_path.parent),
-        )
-        input_data = {}
-    else:
-        machine = FlatMachine(config_file=str(machine_path), hooks=hooks, profiles_file=str(profiles_path))
-        if snapshot and 'context' in snapshot:
-            input_data.update(snapshot['context'])
-    
-    try:
-        result = await machine.execute(input=input_data)
-        print(f"✅ Complete: {result}")
-        conn = sqlite3.connect(db_path)
-        conn.execute("UPDATE executions SET status = 'terminated' WHERE execution_id = ?", (execution_id,))
-        conn.commit()
-        conn.close()
-    except AwaitingApproval as e:
-        print(f"⏸️  Paused: {e.from_state} → {e.to_state}")
-
-def _apply_snapshot(machine_config: dict, snapshot: dict) -> dict:
-    data = machine_config.get("data", {})
-    states = data.get("states", {})
-    target_state = snapshot.get("state")
-
-    if target_state and target_state in states:
-        for state_name, state in states.items():
-            if state.get("type") == "initial":
-                state.pop("type", None)
-        states[target_state]["type"] = "initial"
-    else:
-        print(f"⚠️  Snapshot state '{target_state}' not found. Starting from default initial state.")
-
-    data["context"] = snapshot.get("context", {})
-    machine_config["data"] = data
-    return machine_config
+    subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return True
 
 def display_approval(approval: dict, db_path: str):
     print(f"\n{'═' * 60}")
@@ -188,7 +147,7 @@ def display_approval(approval: dict, db_path: str):
         machine_yaml = row["machine_yaml"]
 
     if machine_yaml:
-        machine = yaml.safe_load(machine_yaml)
+        machine = load_machine_config(machine_yaml)
         data = (machine or {}).get("data", {})
         states = data.get("states", {})
         from_state = states.get(approval["state_name"], {})
@@ -247,11 +206,17 @@ def get_pending_execution(db_path: str, session_id: str | None = None) -> dict:
     conn.close()
     return dict(row) if row else None
 
-def approve(db_path: str, approval_id: int, session_id: str, note: str = None):
+def approve(db_path: str, approval_id: int, session_id: str, execution_id: str, note: str = None):
     conn = sqlite3.connect(db_path)
     now = datetime.now().isoformat()
-    conn.execute("UPDATE pending_approvals SET status = 'approved', human_note = ?, responded_at = ? WHERE id = ?",
-                (note, now, approval_id))
+    conn.execute(
+        "UPDATE pending_approvals SET status = 'approved', human_note = ?, responded_at = ? WHERE id = ?",
+        (note, now, approval_id)
+    )
+    conn.execute(
+        "UPDATE executions SET status = 'pending' WHERE execution_id = ?",
+        (execution_id,)
+    )
     if note:
         cursor = conn.execute("SELECT human_notes FROM ledger WHERE session_id = ?", (session_id,))
         notes = json.loads(cursor.fetchone()[0] or "[]")
