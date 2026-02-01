@@ -4,22 +4,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import logging
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from flatagents import FlatMachine
+from flatagents import FlatMachine, setup_logging, get_logger
 
-from .execution import apply_snapshot, load_machine_config, serialize_snapshot
+from .execution import apply_snapshot, load_machine_config, serialize_snapshot, get_session_log_dir
 from .hooks import AnythingAgentHooks, AwaitingApproval
 from .invoker import AnythingAgentSubprocessInvoker
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 def _resolve_config_dir(machine_config: dict, fallback: Path) -> Path:
@@ -67,6 +61,16 @@ async def run_execution(db_path: str, execution_id: str):
     row = _load_execution(db_path, execution_id)
     session_id = row["session_id"]
     snapshot = json.loads(row["snapshot"]) if row.get("snapshot") else None
+
+    session_log_dir = get_session_log_dir(session_id)
+    os.environ.setdefault("FLATAGENTS_LOG_DIR", str(session_log_dir))
+    os.environ.setdefault("FLATAGENTS_LOG_LEVEL", "DEBUG")
+    os.environ.setdefault("FLATAGENTS_LOG_FORMAT", "standard")
+    os.environ.setdefault("FLATAGENTS_METRICS_ENABLED", "true")
+    os.environ.setdefault("OTEL_METRICS_EXPORTER", "console")
+    os.environ.setdefault("OTEL_SERVICE_NAME", "anything_agent")
+    setup_logging(level=os.environ.get("FLATAGENTS_LOG_LEVEL"), format=os.environ.get("FLATAGENTS_LOG_FORMAT"), force=True)
+    logger = get_logger(__name__)
 
     machine_yaml = row.get("machine_yaml")
     if not machine_yaml:

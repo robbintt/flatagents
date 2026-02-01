@@ -13,6 +13,8 @@ from typing import Any, Dict, Optional
 import yaml
 from flatagents.actions import MachineInvoker
 
+from .execution import get_execution_log_path
+
 
 def _extract_machine_type(config: Dict[str, Any]) -> str:
     metadata = config.get("data", {}).get("metadata", {})
@@ -108,13 +110,18 @@ class AnythingAgentSubprocessInvoker(MachineInvoker):
             "--execution-id",
             execution_id,
         ]
+        log_path = get_execution_log_path(session_id, execution_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = open(log_path, "a", encoding="utf-8")
+
         subprocess.Popen(
             cmd,
             cwd=self.working_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=log_file,
             start_new_session=True,
         )
+        log_file.close()
 
     async def _wait_for_completion(self, execution_id: str, poll_interval: float = 0.5) -> Dict[str, Any]:
         while True:

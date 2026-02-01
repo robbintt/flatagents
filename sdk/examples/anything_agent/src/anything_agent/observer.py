@@ -10,7 +10,7 @@ import yaml
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 
-from .execution import load_machine_config
+from .execution import load_machine_config, get_execution_log_path
 
 session = PromptSession()
 
@@ -20,75 +20,79 @@ async def run_loop(db_path: str, session_id: str | None = None):
     print(f"📁 Database: {db_path}")
     if session_id:
         print(f"🎯 Session: {session_id[:8]}...")
-    print("Commands: [a]pprove, [n]ote (approve + add note), [s]top, [q]uit")
-    print("Idle: [l]ist stopped, [r]eopen stopped, [q]uit")
+    print("Commands: [a]pprove, [n]ote (approve + add note), [s]top, [l]ist stopped, [r]eopen stopped, [q]uit")
     print("-" * 60)
-    
+
+    last_pending_count = 0
+
     while True:
         pending = get_pending_approvals(db_path, session_id)
-        
-        if not pending:
+        pending_count = len(pending)
+
+        if pending_count == 0:
             pending_exec = get_pending_execution(db_path, session_id)
             if pending_exec:
-                if launch_execution(db_path, pending_exec["execution_id"]):
+                if launch_execution(db_path, pending_exec["execution_id"], pending_exec["session_id"]):
                     print(f"\n🚀 Launched {pending_exec['execution_id'][:8]}...")
+                await asyncio.sleep(0.5)
                 continue
 
-            try:
-                response = await session.prompt_async(HTML('<b>Idle [l]ist/[r]eopen/[q]uit: </b>'))
-            except (EOFError, KeyboardInterrupt):
-                print("\n👋 Goodbye")
-                break
+            if last_pending_count != 0:
+                last_pending_count = 0
 
-            response = response.strip().lower()
-            if not response:
-                continue
-
-            parts = response.split()
-            command = parts[0]
-            arg = parts[1] if len(parts) > 1 else None
-
-            if command in ('q', 'quit'):
-                print("👋 Goodbye")
-                break
-            if command in ('l', 'list'):
-                list_stopped_approvals(db_path, session_id)
-                continue
-            if command in ('r', 'resume', 'reopen', 'unstop'):
-                reopened = reopen_stopped_approval(db_path, session_id, arg)
-                if reopened:
-                    print(f"♻️  Reopened approval {reopened['id']} for {reopened['execution_id'][:8]}...")
-                continue
-
-            print("❓ Unknown command. Use [l]ist, [r]eopen, or [q]uit.")
+            await asyncio.sleep(0.5)
             continue
-        
+
+        if pending_count != last_pending_count:
+            print("\a", end="", flush=True)
+            last_pending_count = pending_count
+
+        queue_indicator = "🟢" * pending_count
+        print(f"{queue_indicator} Pending approvals: {pending_count}")
+
         approval = pending[0]
         display_approval(approval, db_path)
-        
+
         try:
-            response = await session.prompt_async(HTML('<b>Decision [a]pprove/[n]ote (approve + note)/[s]top/[q]uit: </b>'))
+            response = await session.prompt_async(
+                HTML('<b>Decision [a]pprove/[n]ote (approve + note)/[s]top/[l]ist/[r]eopen/[q]uit: </b>')
+            )
         except (EOFError, KeyboardInterrupt):
             print("\n👋 Goodbye")
             break
-        
+
         response = response.strip().lower()
-        
-        if response in ('a', 'approve', ''):
+        parts = response.split()
+        command = parts[0] if parts else ""
+        arg = parts[1] if len(parts) > 1 else None
+
+        if command in ('a', 'approve', ''):
             approve(db_path, approval['id'], approval['session_id'], approval['execution_id'])
             print("✅ Approved (queued)")
-        elif response in ('n', 'note'):
+            if launch_execution(db_path, approval['execution_id'], approval['session_id']):
+                print(f"🚀 Launched {approval['execution_id'][:8]}...")
+        elif command in ('n', 'note'):
             note = await session.prompt_async(HTML('<b>Note: </b>'))
             approve(db_path, approval['id'], approval['session_id'], approval['execution_id'], note.strip())
             print("✅ Approved with note (queued)")
-        elif response in ('s', 'stop'):
+            if launch_execution(db_path, approval['execution_id'], approval['session_id']):
+                print(f"🚀 Launched {approval['execution_id'][:8]}...")
+        elif command in ('s', 'stop'):
             stop(db_path, approval['id'])
             print("🛑 Stopped")
-        elif response in ('q', 'quit'):
+        elif command in ('l', 'list'):
+            list_stopped_approvals(db_path, session_id)
+        elif command in ('r', 'resume', 'reopen', 'unstop'):
+            reopened = reopen_stopped_approval(db_path, session_id, arg)
+            if reopened:
+                print(f"♻️  Reopened approval {reopened['id']} for {reopened['execution_id'][:8]}...")
+        elif command in ('q', 'quit'):
             print("👋 Goodbye")
             break
+        else:
+            print("❓ Unknown command. Use [a]pprove, [n]ote, [s]top, [l]ist, [r]eopen, or [q]uit.")
 
-def launch_execution(db_path: str, execution_id: str) -> bool:
+def launch_execution(db_path: str, execution_id: str, session_id: str) -> bool:
     """Launch an execution in a detached subprocess."""
     conn = sqlite3.connect(db_path)
     cursor = conn.execute(
@@ -117,12 +121,17 @@ def launch_execution(db_path: str, execution_id: str) -> bool:
         execution_id,
     ]
 
+    log_path = get_execution_log_path(session_id, execution_id)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = open(log_path, "a", encoding="utf-8")
+
     subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=log_file,
         start_new_session=True,
     )
+    log_file.close()
     return True
 
 def display_approval(approval: dict, db_path: str):
@@ -161,6 +170,9 @@ def display_approval(approval: dict, db_path: str):
         }
         print(yaml.safe_dump(machine_header, sort_keys=False).strip())
 
+        print("\n🧾 Machine YAML (execution):")
+        print(yaml.safe_dump(machine, sort_keys=False).strip())
+
         print("\n➡️  From state definition:")
         print(yaml.safe_dump(from_state or {"missing": True}, sort_keys=False).strip())
 
@@ -174,8 +186,29 @@ def display_approval(approval: dict, db_path: str):
             print("\n🧾 Ledger (db):")
             print(yaml.safe_dump(ledger, sort_keys=False).strip())
 
+    yaml_fields = {
+        "candidate_machine_yaml": context.get("candidate_machine_yaml"),
+        "leaf_machine_yaml": context.get("leaf_machine_yaml"),
+        "self_machine_yaml": context.get("self_machine_yaml"),
+        "return_machine_yaml": context.get("return_machine_yaml"),
+    }
+    for label, yaml_text in yaml_fields.items():
+        if yaml_text:
+            try:
+                parsed = yaml.safe_load(yaml_text)
+                print(f"\n🧾 {label} (formatted):")
+                print(yaml.safe_dump(parsed, sort_keys=False).strip())
+            except Exception:
+                print(f"\n🧾 {label} (raw):")
+                print(yaml_text)
+
+    display_context = dict(context)
+    for label, yaml_text in yaml_fields.items():
+        if yaml_text:
+            display_context[label] = "<see formatted above>"
+
     print("\n📦 Context snapshot:")
-    print(json.dumps(context, indent=2, sort_keys=True))
+    print(json.dumps(display_context, indent=2, sort_keys=True))
     print('═' * 60)
 
 def get_pending_approvals(db_path: str, session_id: str | None = None) -> list:
@@ -183,11 +216,11 @@ def get_pending_approvals(db_path: str, session_id: str | None = None) -> list:
     conn.row_factory = sqlite3.Row
     if session_id:
         cursor = conn.execute(
-            "SELECT * FROM pending_approvals WHERE status = 'pending' AND session_id = ? ORDER BY created_at LIMIT 1",
+            "SELECT * FROM pending_approvals WHERE status = 'pending' AND session_id = ? ORDER BY created_at",
             (session_id,)
         )
     else:
-        cursor = conn.execute("SELECT * FROM pending_approvals WHERE status = 'pending' ORDER BY created_at LIMIT 1")
+        cursor = conn.execute("SELECT * FROM pending_approvals WHERE status = 'pending' ORDER BY created_at")
     result = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return result

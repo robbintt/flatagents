@@ -3,7 +3,7 @@ spec_version: "0.9.0"
 
 data:
   name: core
-  
+
   context:
     session_id: "{{ input.session_id }}"
     db_path: "{{ input.db_path }}"
@@ -11,13 +11,12 @@ data:
     context_target_pct: 0.20
     context_minimum: 12000
     leaf_result: "{{ input.leaf_result | default('') }}"
-    has_leaf_result: false
-  
+    validation_errors: "{{ input.validation_errors | default([]) }}"
+    candidate_machine_yaml: "{{ input.candidate_machine_yaml | default('') }}"
+
   agents:
-    thinker: ./agents/thinker.yml
-    worker: ./agents/worker.yml
-    reflector: ./agents/reflector.yml
-  
+    driver: ./agents/driver.yml
+
   states:
     start:
       type: initial
@@ -27,64 +26,75 @@ data:
     load_context:
       action: load_context
       transitions:
-        - condition: "context.has_leaf_result == true"
-          to: process_leaf
-        - to: think
+        - to: decide
 
-    process_leaf:
-      agent: reflector
+    decide:
+      agent: driver
       input:
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
         leaf_result: "{{ context.leaf_result }}"
-        ledger: "{{ context.ledger }}"
-        guidance: "{{ context.guidance }}"
-      output_to_context:
-        ledger_update: "{{ output.ledger_update }}"
-      transitions:
-        - to: cleanup
-    
-    think:
-      agent: thinker
-      input:
-        ledger: "{{ context.ledger }}"
-        guidance: "{{ context.guidance }}"
         token_budget: "{{ context.token_budget }}"
+        token_estimate: "{{ context.token_estimate }}"
+        validation_errors: "{{ context.validation_errors }}"
+        candidate_machine_yaml: "{{ context.candidate_machine_yaml }}"
+        self_machine_yaml: "{{ context.self_machine_yaml | default('') }}"
       output_to_context:
         next_action: "{{ output.action }}"
         action_detail: "{{ output.detail }}"
+        leaf_machine_yaml: "{{ output.leaf_machine_yaml | default('') }}"
+        self_machine_yaml: "{{ output.self_machine_yaml | default(context.self_machine_yaml | default('')) }}"
         ledger_update: "{{ output.ledger_update | default({}) }}"
+        validation_kind: "{{ 'leaf' if output.action == 'delegate' else 'self' if output.action == 'spawn_self' else '' }}"
       transitions:
+        - to: validate_decision
+
+    validate_decision:
+      action: validate_decision
+      transitions:
+        - condition: "context.decision_valid != true"
+          to: decide
         - condition: "context.next_action == 'done'"
           to: save_and_done
-        - to: work
+        - condition: "context.next_action == 'delegate'"
+          to: validate_leaf
+        - condition: "context.next_action == 'spawn_self'"
+          to: validate_self
+        - to: decide
 
-    work:
-      agent: worker
-      input:
-        task: "{{ context.action_detail }}"
-        ledger: "{{ context.ledger }}"
-        guidance: "{{ context.guidance }}"
-      output_to_context:
-        work_result: "{{ output.result }}"
-        work_success: "{{ output.success }}"
+    validate_leaf:
+      action: validate_specs
       transitions:
-        - to: cleanup
+        - condition: "context.validation_passed == true"
+          to: save_before_leaf
+        - to: decide
 
-    cleanup:
-      action: cleanup_context
+    save_before_leaf:
+      action: save_ledger
       transitions:
-        - to: reflect
+        - to: spawn_leaf
 
-    reflect:
-      agent: reflector
-      input:
-        work_result: "{{ context.work_result }}"
-        work_success: "{{ context.work_success }}"
-        ledger: "{{ context.ledger }}"
-        guidance: "{{ context.guidance }}"
-      output_to_context:
-        ledger_update: "{{ output.ledger_update }}"
+    spawn_leaf:
+      action: spawn_leaf
       transitions:
-        - to: save_ledger
+        - to: done
+
+    validate_self:
+      action: validate_specs
+      transitions:
+        - condition: "context.validation_passed == true"
+          to: save_before_self
+        - to: decide
+
+    save_before_self:
+      action: save_ledger
+      transitions:
+        - to: spawn_self
+
+    spawn_self:
+      action: spawn_self
+      transitions:
+        - to: done
 
     save_ledger:
       action: save_ledger
