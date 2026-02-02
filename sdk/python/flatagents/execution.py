@@ -26,6 +26,85 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _coerce_status_code(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
+
+
+def _extract_status_code(error: Optional[BaseException]) -> Optional[int]:
+    if error is None:
+        return None
+
+    for attr in ("status_code", "status", "http_status", "statusCode"):
+        code = _coerce_status_code(getattr(error, attr, None))
+        if code is not None:
+            return code
+
+    response = getattr(error, "response", None)
+    if response is not None:
+        for attr in ("status_code", "status", "http_status", "statusCode"):
+            code = _coerce_status_code(getattr(response, attr, None))
+            if code is not None:
+                return code
+        if isinstance(response, dict):
+            for key in ("status_code", "status", "http_status", "statusCode"):
+                code = _coerce_status_code(response.get(key))
+                if code is not None:
+                    return code
+
+    match = re.search(r"\b([4-5]\d{2})\b", str(error))
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _normalize_headers(raw_headers: Any) -> Dict[str, str]:
+    if raw_headers is None:
+        return {}
+
+    if isinstance(raw_headers, dict):
+        items = raw_headers.items()
+    elif hasattr(raw_headers, "items"):
+        items = raw_headers.items()
+    elif isinstance(raw_headers, (list, tuple)):
+        items = raw_headers
+    else:
+        return {}
+
+    normalized: Dict[str, str] = {}
+    for key, value in items:
+        if key is None:
+            continue
+        key_text = str(key).lower()
+        if isinstance(value, (list, tuple)):
+            value_text = ",".join(str(item) for item in value)
+        else:
+            value_text = str(value)
+        normalized[key_text] = value_text
+
+    return normalized
+
+
+def _extract_error_headers(error: Optional[BaseException]) -> Dict[str, str]:
+    if error is None:
+        return {}
+
+    response = getattr(error, "response", None)
+    headers: Dict[str, str] = {}
+    if response is not None:
+        headers.update(_normalize_headers(getattr(response, "headers", None)))
+        if not headers and isinstance(response, dict):
+            headers.update(_normalize_headers(response.get("headers")))
+
+    headers.update(_normalize_headers(getattr(error, "headers", None)))
+    return headers
+
+
 # Registry of execution types
 _EXECUTION_TYPES: Dict[str, type] = {}
 
@@ -238,7 +317,17 @@ class RetryExecution(ExecutionType):
         
         # All retries exhausted
         logger.error(f"All {max_attempts} attempts failed. Last error: {last_error}")
-        return None
+        error_payload: Dict[str, Any] = {
+            "_error": str(last_error) if last_error else "LLM call failed",
+            "_error_type": type(last_error).__name__ if last_error else "UnknownError",
+        }
+        status_code = _extract_status_code(last_error)
+        if status_code is not None:
+            error_payload["_error_status_code"] = status_code
+        headers = _extract_error_headers(last_error)
+        if headers:
+            error_payload["_error_headers"] = headers
+        return error_payload
 
 
 # MDAP Voting Execution Type

@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Tuple, Callable, List, Dict, Optional, Protocol, runtime_checkable
 
 from .monitoring import get_logger, track_operation
-from .utils import strip_markdown_json
+from .utils import strip_markdown_json, consume_litellm_stream
 
 logger = get_logger(__name__)
 
@@ -125,11 +125,22 @@ class LiteLLMBackend:
                 self.total_api_calls += 1
                 logger.info(f"Calling LLM (Attempt {attempt + 1}/{len(self.retry_delays)})...")
 
-                response = await litellm.acompletion(
-                    model=self.model,
-                    messages=messages,
-                    **call_kwargs
-                )
+                if call_kwargs.get("stream"):
+                    stream = await litellm.acompletion(
+                        model=self.model,
+                        messages=messages,
+                        **call_kwargs
+                    )
+                    if hasattr(stream, "__aiter__"):
+                        response = await consume_litellm_stream(stream)
+                    else:
+                        response = stream
+                else:
+                    response = await litellm.acompletion(
+                        model=self.model,
+                        messages=messages,
+                        **call_kwargs
+                    )
 
                 if response is None or response.choices is None or len(response.choices) == 0:
                     raise ValueError("Received an empty or invalid response from the LLM.")

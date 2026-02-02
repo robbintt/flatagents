@@ -105,6 +105,7 @@
  * presence_penalty  - Presence penalty (-2.0 to 2.0)
  * seed              - Random seed for reproducibility
  * base_url          - Custom base URL for the API (e.g., for local models or proxies)
+ * stream            - Enable streaming responses (default: false)
  */
 
 export const SPEC_VERSION = "0.9.0";
@@ -133,6 +134,7 @@ export interface ModelProfileConfig {
   presence_penalty?: number;
   seed?: number;
   base_url?: string;
+  stream?: boolean;
 }
 
 export type FlatprofilesConfig = ProfilesWrapper;

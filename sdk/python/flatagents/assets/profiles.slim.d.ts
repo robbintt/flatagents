@@ -21,5 +21,6 @@ export interface ModelProfileConfig {
     presence_penalty?: number;
     seed?: number;
     base_url?: string;
+    stream?: boolean;
 }
 export type FlatprofilesConfig = ProfilesWrapper;

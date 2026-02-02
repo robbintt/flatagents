@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import __version__
 from .monitoring import get_logger, AgentMonitor
-from .utils import strip_markdown_json, check_spec_version
+from .utils import strip_markdown_json, check_spec_version, consume_litellm_stream
 from .baseagent import (
     FlatAgent as BaseFlatAgent,
     LLMBackend,
@@ -196,8 +196,14 @@ class FlatAgent:
 
         if self._backend == "aisuite":
             return await self._call_aisuite(params)
-        else:
-            return await litellm.acompletion(**params)
+
+        if params.get("stream"):
+            stream = await litellm.acompletion(**params)
+            if hasattr(stream, "__aiter__"):
+                return await consume_litellm_stream(stream)
+            return stream
+
+        return await litellm.acompletion(**params)
 
     async def _call_aisuite(self, params: Dict[str, Any]) -> Any:
         """Call LLM via aisuite backend."""
@@ -328,6 +334,9 @@ class FlatAgent:
         self.presence_penalty = kwargs.get('presence_penalty', model_config.get('presence_penalty'))
         self.seed = kwargs.get('seed', model_config.get('seed'))
         self.base_url = kwargs.get('base_url', model_config.get('base_url'))
+        stream_value = kwargs.get('stream', model_config.get('stream', False))
+        self.stream = bool(stream_value)
+        self.stream_options = kwargs.get('stream_options', model_config.get('stream_options'))
 
         # Store full model config for template access (includes custom fields)
         self._model_config_raw = model_config
@@ -693,6 +702,10 @@ class FlatAgent:
             params["seed"] = self.seed
         if self.base_url is not None:
             params["api_base"] = self.base_url  # litellm uses api_base
+        if self.stream:
+            params["stream"] = True
+            if self.stream_options is not None:
+                params["stream_options"] = self.stream_options
 
         # Add tools if available
         if tools:
