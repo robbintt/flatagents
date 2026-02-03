@@ -79,6 +79,9 @@
         },
         "base_url": {
           "type": "string"
+        },
+        "stream": {
+          "type": "boolean"
         }
       },
       "required": [

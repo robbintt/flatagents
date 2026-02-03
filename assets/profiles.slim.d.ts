@@ -1,4 +1,4 @@
-export const SPEC_VERSION = "0.9.0";
+export const SPEC_VERSION = "0.10.0";
 export interface ProfilesWrapper {
     spec: "flatprofiles";
     spec_version: string;
@@ -21,5 +21,6 @@ export interface ModelProfileConfig {
     presence_penalty?: number;
     seed?: number;
     base_url?: string;
+    stream?: boolean;
 }
 export type FlatprofilesConfig = ProfilesWrapper;

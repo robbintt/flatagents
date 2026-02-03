@@ -22,7 +22,7 @@
 ```yaml
 # profiles.yml — agents reference by name
 spec: flatprofiles
-spec_version: "0.9.0"
+spec_version: "0.10.0"
 data:
   model_profiles:
     fast: { provider: cerebras, name: zai-glm-4.6, temperature: 0.6 }
@@ -79,6 +79,28 @@ machine: processor
 launch: background_task
 launch_input: { data: "{{ context.data }}" }
 ```
+
+## Distributed Worker Pattern
+
+Use hook actions (e.g., `DistributedWorkerHooks`) with a `RegistrationBackend` + `WorkBackend` to build worker pools.
+
+**Core machines**
+- **Checker**: `get_pool_state` → `calculate_spawn` → `spawn_workers`
+- **Worker**: `register_worker` → `claim_job` → process → `complete_job`/`fail_job` → `deregister_worker`
+- **Reaper**: `list_stale_workers` → `reap_stale_workers`
+
+`spawn_workers` expects `worker_config_path` in context (or override hooks to resolve it). Custom queues can compose the base hooks and add actions.
+
+```yaml
+context:
+  worker_config_path: "./job_worker.yml"
+states:
+  check_state: { action: get_pool_state }
+  calculate_spawn: { action: calculate_spawn }
+  spawn_workers: { action: spawn_workers }
+```
+
+See `sdk/examples/distributed_worker/` for a full example.
 
 ## Context Variables
 

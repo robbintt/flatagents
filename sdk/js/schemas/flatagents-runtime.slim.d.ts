@@ -157,7 +157,7 @@ export interface BackendConfig {
     work?: "memory" | "sqlite" | "redis";
     sqlite_path?: string;
 }
-export const SPEC_VERSION = "0.9.0";
+export const SPEC_VERSION = "0.10.0";
 export interface SDKRuntimeWrapper {
     spec: "flatagents-runtime";
     spec_version: typeof SPEC_VERSION;
