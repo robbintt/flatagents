@@ -1,0 +1,42 @@
+[project]
+name = "mcp-box-template"
+version = "0.1.0"
+description = "A reusable AgentDistill-style MCP-Box template using FastMCP with optional SQLite persistence"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { email = "memgrafter@gmail.com" }
+]
+keywords = ["mcp", "agents", "ai", "fastmcp", "tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=0.1.0"]
+all = ["mcp>=0.1.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_box"]
+
+[project.scripts]
+mcp-box-build = "scripts.build_box:main"
+mcp-box-run = "scripts.run_student:main"
+mcp-box-eval = "scripts.eval_box:main"
