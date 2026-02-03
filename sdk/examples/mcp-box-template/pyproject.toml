@@ -3,7 +3,7 @@ name = "mcp-box-template"
 version = "0.1.0"
 description = "A reusable AgentDistill-style MCP-Box template using FastMCP with optional SQLite persistence"
 readme = "README.md"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     { email = "memgrafter@gmail.com" }

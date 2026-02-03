@@ -167,7 +167,8 @@ class MCPBoxDatabase:
         ))
         
         conn.commit()
-        return cursor.lastrowid or 0
+        # Return lastrowid, defaulting to 0 only if None
+        return cursor.lastrowid if cursor.lastrowid is not None else 0
     
     def get_box(self, name: str) -> Optional[Dict[str, Any]]:
         """
@@ -262,7 +263,7 @@ class MCPBoxDatabase:
         ))
         
         conn.commit()
-        return cursor.lastrowid or 0
+        return cursor.lastrowid if cursor.lastrowid is not None else 0
     
     def get_runs(
         self,
@@ -365,7 +366,7 @@ class MCPBoxDatabase:
         ))
         
         conn.commit()
-        return cursor.lastrowid or 0
+        return cursor.lastrowid if cursor.lastrowid is not None else 0
     
     def get_success_rate(self, box_name: str) -> float:
         """

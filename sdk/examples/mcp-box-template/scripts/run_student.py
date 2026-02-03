@@ -41,7 +41,12 @@ def print_result(result: TaskResult, verbose: bool = False):
     if result.result:
         print(f"   Result:")
         if isinstance(result.result, (list, dict)):
-            print(f"      {json.dumps(result.result, indent=6)[:500]}")
+            formatted = json.dumps(result.result, indent=6)
+            # Truncate long output with ellipsis, preserving structure
+            max_len = 500
+            if len(formatted) > max_len:
+                formatted = formatted[:max_len] + "\n      ... (truncated)"
+            print(f"      {formatted}")
         else:
             print(f"      {result.result}")
     

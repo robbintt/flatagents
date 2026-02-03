@@ -103,10 +103,17 @@ class ConsolidatePipeline:
             if param_info.get("default") is not None:
                 parameters[param_name]["default"] = param_info["default"]
         
+        # Use source from metadata if available, otherwise construct from name
+        # Note: The function path should match the actual tool location
+        function_path = tool.metadata.get(
+            "function_path",
+            f"mcp_box.tools.custom.{tool.name}"  # Default path for custom tools
+        )
+        
         return ToolSpec(
             name=tool.name,
             description=tool.description,
-            function=f"mcp_box.tools.{tool.category}.{tool.name}",
+            function=function_path,
             parameters=parameters,
             return_type=self._python_type_to_json(tool.return_type),
             category=tool.category,
