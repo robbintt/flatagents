@@ -45,17 +45,7 @@
         "agents": {
           "type": "object",
           "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/definitions/AgentWrapper"
-              },
-              {
-                "$ref": "#/definitions/AgentRefConfig"
-              }
-            ]
+            "$ref": "#/definitions/AgentRef"
           }
         },
         "machines": {
@@ -92,6 +82,19 @@
       ],
       "additionalProperties": false
     },
+    "AgentRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/AgentWrapper"
+        },
+        {
+          "$ref": "#/definitions/AgentRefConfig"
+        }
+      ]
+    },
     "AgentWrapper": {
       "type": "object",
       "properties": {
@@ -113,24 +116,6 @@
         "spec",
         "spec_version",
         "data"
-      ],
-      "additionalProperties": false
-    },
-    "AgentRefConfig": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "ref": {
-          "type": "string"
-        },
-        "config": {
-          "type": "object"
-        }
-      },
-      "required": [
-        "type"
       ],
       "additionalProperties": false
     },
@@ -373,6 +358,24 @@
           }
         }
       },
+      "additionalProperties": false
+    },
+    "AgentRefConfig": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type"
+      ],
       "additionalProperties": false
     },
     "StateDefinition": {

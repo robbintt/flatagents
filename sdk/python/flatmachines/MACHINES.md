@@ -1,13 +1,13 @@
-# FlatMachines Reference
+# FlatMachines (Python SDK) Reference
 
-> **Target: <1000 tokens.** LLM-optimized. See `flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts` for schemas.
+> **Target: ~1000 tokens.** LLM‑optimized. See `flatmachine.d.ts` + `flatagent.d.ts` for schemas.
 >
-> **Versioning:** All specs and SDKs use lockstep versioning.
+> **Scope:** This file documents the **Python FlatMachines runtime** (orchestration). It is agent‑framework‑agnostic and uses adapters to execute agents.
 
 ## Concepts
 
-**FlatAgent**: Single LLM call. Model + prompts + output schema. No orchestration.
-**FlatMachine**: State machine orchestrating agents. States, transitions, conditions, loops, error handling.
+**FlatAgent**: Single LLM call (flatagents or other frameworks).
+**FlatMachine**: State machine orchestrating agents, actions, and peer machines.
 
 | Need | Use |
 |------|-----|
@@ -17,109 +17,189 @@
 | Dynamic parallelism | `foreach` |
 | Background tasks | `launch` |
 
-## Model Profiles
+## Machine Config (Envelope)
 
 ```yaml
-# profiles.yml — agents reference by name
-spec: flatprofiles
+spec: flatmachine
 spec_version: "0.10.0"
+
 data:
-  model_profiles:
-    fast: { provider: cerebras, name: zai-glm-4.6, temperature: 0.6 }
-    smart: { provider: anthropic, name: claude-3-opus-20240229 }
-  default: fast        # Fallback
-  # override: smart    # Force all
+  name: writer-critic-loop
+  expression_engine: simple    # simple | cel
+  context: { ... }             # initial context (templated)
+  agents: { ... }              # agent references
+  machines: { ... }            # peer machine refs
+  states: { ... }              # state definitions
+  settings: { ... }            # adapter/runtime settings
+  persistence: { enabled: true, backend: local | memory }
+  hooks: { file/module, class, args }
+
+metadata: { ... }
 ```
 
-Agent model field: `"fast"` | `{ profile: "fast", temperature: 0.9 }` | `{ provider: x, name: y }`
-Resolution: default → profile → overrides → override
+### Agent References (Adapter‑agnostic)
 
-## State Fields
+`data.agents` values can be:
+- String path to a flatagent config (default adapter `flatagent`).
+- Inline flatagent config (`spec: flatagent`).
+- Typed adapter ref: `{ type: "flatagent" | "smolagents" | "pi-agent", ref?: "...", config?: {...} }`.
 
-| Field | Purpose |
-|-------|---------|
-| `type` | `initial` (entry) / `final` (exit+output) |
-| `agent` | Agent to call |
-| `machine` | Machine(s) — string or `[array]` for parallel |
-| `foreach` | Array expr for dynamic parallelism (`as`: item var, `key`: result key) |
-| `launch` / `launch_input` | Fire-and-forget machine(s) |
-| `input` | Map input to agent/machine |
-| `output_to_context` | Map `output.*` to `context.*` |
-| `execution` | `{ type: retry, backoffs: [2,8,16], jitter: 0.1 }` |
-| `on_error` | State name or `{ default: x, ErrorType: y }` |
-| `transitions` | `[{ condition: "expr", to: state }, { to: default }]` |
-| `mode` | `settled` (all) / `any` (first) for parallel |
-| `timeout` | Seconds (0=forever) |
-
-## Patterns
-
-**Execution types**: `default` | `retry` (backoffs, jitter) | `parallel` (n_samples) | `mdap_voting` (k_margin, max_candidates)
-
-**Transitions**: `condition: "context.score >= 8"` with `to: state`. Last without condition = default.
-
-**Loops**: Transition `to: same_state`. Machine has `max_steps` safety.
-
-**Errors**: `on_error: state` or per-type. Context gets `last_error`, `last_error_type`.
-
-**Parallel machines**:
+Examples:
 ```yaml
-machine: [review_a, review_b]  # Results keyed by name
-mode: settled  # or "any"
+agents:
+  reviewer: ./reviewer.yml
+  smol: { type: smolagents, ref: ./smol_factory.py#build_agent }
+  pi: { type: pi-agent, ref: "@pi-mono/agent#review" }
 ```
 
-**Foreach**:
+**Adapter registry:** FlatMachines uses `AgentAdapterRegistry` to build `AgentExecutor`s. Built‑in adapters are registered automatically if their deps are installed:
+- **flatagent** (requires `flatagents`)
+- **smolagents** (requires `smolagents`)
+- **pi-agent** (Node bridge; uses `pi_agent_runner.mjs`)
+
+Custom adapters can be registered via `agent_registry=` or `agent_adapters=[...]`.
+
+### Settings (adapter/runtime)
+
+`data.settings` is passed to adapters via `AgentAdapterContext`. The pi‑agent bridge reads:
 ```yaml
-foreach: "{{ context.items }}"
-as: item
-machine: processor
+settings:
+  agent_runners:
+    pi_agent:
+      runner: ./path/to/pi_agent_runner.mjs
+      node: node
+      timeout: 30
+      cwd: .
+      env: { PI_API_KEY: "..." }
 ```
 
-**Launch** (fire-and-forget):
+## State Execution Order (Python runtime)
+
+For each state, the runtime executes in this order:
+1. **action** → calls hooks `on_action` (default `HookAction`).
+2. **launch** → fire‑and‑forget machine(s) (outbox pattern + invoker).
+3. **machine / foreach** → peer machine invocation (blocking).
+4. **agent** → execute agent via adapter + execution strategy.
+5. **final output** → render `output` if `type: final`.
+
+### Template Variables
+
+Jinja2 renders `input`, `context`, and `output` as dicts. Special behavior:
+- If a template string has no Jinja2 syntax and looks like `context.foo`, it returns the **actual value** (not a string).
+- The Jinja2 environment auto‑serializes lists/dicts to JSON and includes a `fromjson` filter.
+
+Use in `input`/`output_to_context`/`context`:
 ```yaml
-launch: background_task
-launch_input: { data: "{{ context.data }}" }
+input:
+  prompt: "{{ context.topic }}"
+  raw_context: "context"      # literal string
+  parsed: "{{ context.json | fromjson }}"
 ```
 
-## Distributed Worker Pattern
+## Transitions & Expressions
 
-Use hook actions (e.g., `DistributedWorkerHooks`) with a `RegistrationBackend` + `WorkBackend` to build worker pools.
+`transitions` are evaluated in order; the last transition without a condition is default.
 
-**Core machines**
-- **Checker**: `get_pool_state` → `calculate_spawn` → `spawn_workers`
-- **Worker**: `register_worker` → `claim_job` → process → `complete_job`/`fail_job` → `deregister_worker`
-- **Reaper**: `list_stale_workers` → `reap_stale_workers`
+Expression engines:
+- **simple** (default): basic comparisons/boolean logic.
+- **cel**: CEL support via `flatmachines[cel]`.
 
-`spawn_workers` expects `worker_config_path` in context (or override hooks to resolve it). Custom queues can compose the base hooks and add actions.
+`on_error` supports:
+```yaml
+on_error: retry_state
+# or
+on_error:
+  RateLimitError: retry_state
+  default: error_state
+```
+
+When errors occur, the runtime sets `context.last_error` and `context.last_error_type`.
+
+## Execution Types (Agent Calls)
+
+Execution types operate over an `AgentExecutor` and return `AgentResult`:
+- `default` – single call
+- `retry` – backoff + jitter
+- `parallel` – N samples
+- `mdap_voting` – consensus across samples
 
 ```yaml
-context:
-  worker_config_path: "./job_worker.yml"
-states:
-  check_state: { action: get_pool_state }
-  calculate_spawn: { action: calculate_spawn }
-  spawn_workers: { action: spawn_workers }
+execution:
+  type: retry
+  backoffs: [2, 8, 16]
+  jitter: 0.1
 ```
 
-See `sdk/examples/distributed_worker/` for a full example.
+Usage/cost metrics from `AgentResult` are accumulated into `FlatMachine.total_api_calls` and `total_cost`.
 
-## Context Variables
+## Peer Machines, Parallelism, Foreach
 
-`context.*` (all states), `input.*` (initial), `output.*` (in output_to_context), `item`/`as` (foreach)
+- `machine: child` → invoke peer machine and block.
+- `machine: [a, b, c]` → parallel invoke; `mode: settled | any`.
+- `foreach: "{{ context.items }}"` → dynamic parallelism.
+- `launch: child` → fire‑and‑forget launch; result written to backend.
+
+For `mode: any`, the first completed result is returned; remaining tasks continue in background.
+
+## Invokers & Result Backends
+
+The runtime delegates machine launches to a **MachineInvoker**:
+- **InlineInvoker** (default): same process; launches background tasks.
+- **QueueInvoker**: abstract base for external queue dispatch.
+- **SubprocessInvoker**: spawns `python -m flatmachines.run` subprocesses.
+
+Results are written/read via a **ResultBackend** using URIs:
+`flatagents://{execution_id}/result`. The default backend is in‑memory.
+
+## Persistence & Resume
+
+Persistence is enabled by default and uses a `MemoryBackend` unless configured.
+
+```yaml
+persistence:
+  enabled: true
+  backend: local   # local | memory
+  checkpoint_on: [machine_start, state_enter, execute, state_exit, machine_end]
+```
+
+Checkpoints store `MachineSnapshot` (context, state, output, costs, pending launches). Resume with:
+```python
+await machine.execute(resume_from=execution_id)
+```
 
 ## Hooks
 
-`on_machine_start`, `on_machine_end`, `on_state_enter`, `on_state_exit`, `on_transition`, `on_error`, `on_action`
-
-```python
-class MyHooks(MachineHooks):
-    def on_action(self, action: str, context: dict) -> dict:
-        if action == "fetch": context["data"] = api_call()
-        return context
-```
-
-## Persistence
+Configure hooks in `data.hooks`:
+- **file**: local file path (stateful OK)
+- **module**: installed module (stateless required)
 
 ```yaml
-persistence: { enabled: true, backend: local }  # local | memory
+hooks:
+  file: ./hooks.py
+  class: MyHooks
+  args: { ... }
 ```
-Resume: `machine.execute(resume_from=execution_id)`
+
+Built‑ins: `LoggingHooks`, `MetricsHooks`, `WebhookHooks`, `CompositeHooks`.
+
+## CLI Runner
+
+```bash
+python -m flatmachines.run --config machine.yml --input '{"key": "value"}'
+```
+
+This is used by `SubprocessInvoker` for isolated execution.
+
+## Distributed Worker Pattern
+
+FlatMachines includes the worker orchestration helpers:
+- `DistributedWorkerHooks`
+- `RegistrationBackend` + `WorkBackend` (SQLite or in‑memory)
+
+This powers **checker/worker/reaper** topologies in the examples.
+
+## Compatibility Notes
+
+- FlatMachines is **agent‑framework‑agnostic**. It requires adapters for execution.
+- Install with `flatmachines[flatagents]` to use FlatAgent configs directly.
+- Agent and machine schemas remain lockstep with repository versions.

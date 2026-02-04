@@ -25,12 +25,6 @@
         "execution_config": {
           "$ref": "#/definitions/ExecutionConfig"
         },
-        "agent_executor": {
-          "$ref": "#/definitions/AgentExecutor"
-        },
-        "agent_result": {
-          "$ref": "#/definitions/AgentResult"
-        },
         "machine_hooks": {
           "$ref": "#/definitions/MachineHooks"
         },
@@ -107,32 +101,6 @@
       "required": [
         "type"
       ],
-      "additionalProperties": false
-    },
-    "AgentResult": {
-      "type": "object",
-      "properties": {
-        "output": {
-          "type": "object"
-        },
-        "content": {
-          "type": "string"
-        },
-        "raw": {},
-        "usage": {
-          "type": "object"
-        },
-        "cost": {
-          "type": "number"
-        },
-        "metadata": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    "AgentExecutor": {
-      "type": "object",
       "additionalProperties": false
     },
     "MachineHooks": {

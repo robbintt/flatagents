@@ -182,6 +182,7 @@ if (args[0] === "--extract-version" && args[1]) {
 const targetDirs = args.length > 0 ? args : [
   path.join(REPO_ROOT, "assets"),
   path.join(REPO_ROOT, "sdk", "python", "flatagents", "assets"),
+  path.join(REPO_ROOT, "sdk", "python", "flatmachines", "assets"),
   path.join(REPO_ROOT, "sdk", "js", "schemas"),
 ];
 
