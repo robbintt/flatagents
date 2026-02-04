@@ -2,7 +2,7 @@
 # Demonstrates On-The-Fly (OTF) agent generation with pre-execution supervision
 
 spec: flatmachine
-spec_version: "0.9.0"
+spec_version: "1.0.0"
 
 data:
   name: dynamic-agent

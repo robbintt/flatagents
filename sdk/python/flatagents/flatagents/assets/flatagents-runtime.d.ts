@@ -499,7 +499,7 @@ export interface BackendConfig {
     sqlite_path?: string;
 }
 
-export const SPEC_VERSION = "0.10.0";
+export const SPEC_VERSION = "1.0.0";
 
 /**
  * Wrapper interface for JSON schema generation.

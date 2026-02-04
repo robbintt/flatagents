@@ -67,14 +67,16 @@ if [[ -z "$NEW_VERSION" ]]; then
     echo ""
     echo "What gets updated:"
     echo "  Always:     Root .d.ts specs, README.md, MACHINES.md"
-    echo "  --python:   sdk/python/pyproject.toml, sdk/python/flatagents/__init__.py,"
-    echo "              sdk/python/examples/**/config/*.yml"
+    echo "  --python:   sdk/python/flatagents/pyproject.toml, sdk/python/flatmachines/pyproject.toml"
+    echo "              sdk/python/flatagents/flatagents/__init__.py"
+    echo "              sdk/python/flatmachines/flatmachines/__init__.py"
     echo "  --js:       sdk/js/package.json"
     echo "  --examples: sdk/examples/**/*.yml"
     echo ""
     echo "NOT updated (generated from sources):"
     echo "  - assets/*.d.ts (run scripts/generate-spec-assets.sh)"
-    echo "  - sdk/python/flatagents/assets/*.d.ts (run sdk/python/release.sh)"
+    echo "  - sdk/python/flatagents/flatagents/assets/*.d.ts (run sdk/python/release.sh)"
+    echo "  - sdk/python/flatmachines/flatmachines/assets/*.d.ts (run sdk/python/release.sh)"
     echo ""
     echo "Examples:"
     echo "  update-spec-versions.sh 0.8.0              # dry-run, specs only"
@@ -167,15 +169,12 @@ if [[ "$UPDATE_PYTHON" == true ]]; then
     echo "Python SDK:"
 
     # pyproject.toml
-    update_file "sdk/python/pyproject.toml" "(^version = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
+    update_file "sdk/python/flatagents/pyproject.toml" "(^version = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
+    update_file "sdk/python/flatmachines/pyproject.toml" "(^version = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
 
     # __init__.py __version__
-    update_file "sdk/python/flatagents/__init__.py" "(__version__ = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
-    echo ""
-
-    # Python SDK examples
-    echo "Python SDK examples (sdk/python/examples/**/*.yml):"
-    update_yml_files "sdk/python/examples"
+    update_file "sdk/python/flatagents/flatagents/__init__.py" "(__version__ = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
+    update_file "sdk/python/flatmachines/flatmachines/__init__.py" "(__version__ = \")[0-9]+\.[0-9]+\.[0-9]+(\")" "\1$NEW_VERSION\2"
     echo ""
 fi
 
@@ -214,7 +213,8 @@ else
     echo "  1. Run 'scripts/generate-spec-assets.sh' to regenerate assets"
     echo "  2. Run 'scripts/lint-spec-versions.sh' to verify"
     if [[ "$UPDATE_PYTHON" == true ]]; then
-        echo "  3. Run 'sdk/python/release.sh' to build & verify Python SDK"
+        echo "  3. Run 'sdk/python/flatagents/release.sh' to build & verify Python SDK"
+        echo "  3. Run 'sdk/python/flatmachines/release.sh' to build & verify Python SDK"
     fi
     if [[ "$UPDATE_JS" == true ]]; then
         echo "  3. Run 'cd sdk/js && npm publish' to publish to npm"
