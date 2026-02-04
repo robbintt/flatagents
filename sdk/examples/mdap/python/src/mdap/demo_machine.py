@@ -10,7 +10,8 @@ Usage:
 import asyncio
 from pathlib import Path
 
-from flatagents import FlatMachine, FlatAgent, MDAPVotingExecution, setup_logging, get_logger
+from flatmachines import FlatMachine, MDAPVotingExecution, setup_logging, get_logger
+from flatagents import FlatAgent
 
 # Configure logging
 setup_logging(level='INFO')

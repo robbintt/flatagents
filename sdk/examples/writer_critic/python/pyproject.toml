@@ -1,8 +1,8 @@
 [project]
 name = "writer_critic"
 version = "0.1.0"
-description = "Writer-Critic multi-agent demo for FlatAgents"
-dependencies = ["flatagents[litellm]"]
+description = "Writer-Critic multi-agent demo for FlatMachines"
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
 requires-python = ">=3.10"
 
 [build-system]

@@ -9,7 +9,7 @@ Also provides exploration tools (tree, ripgrep, read_file) for accurate diffs.
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
-from flatagents import MachineHooks
+from flatmachines import MachineHooks
 
 
 class CodingAgentHooks(MachineHooks):

@@ -1,8 +1,8 @@
 [project]
 name = "peering"
 version = "0.1.0"
-description = "Machine peering demo for FlatAgents"
-dependencies = ["flatagents[litellm]"]
+description = "Machine peering demo for FlatMachines"
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
 requires-python = ">=3.10"
 
 [build-system]

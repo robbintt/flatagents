@@ -1,9 +1,9 @@
 # FlatAgent HelloWorld Demo
 
-A simple "Hello, World!" project that demonstrates how to use the `flatagents` library.
+A simple "Hello, World!" project that demonstrates how to use the `flatmachines` + `flatagents` libraries.
 
-The demo involves an agent that attempts to build the string "Hello, World!" by querying an LLM one character at a time. It showcases the core components of the library, including:
-- Using a `FlatAgent` from YAML configuration.
+The demo involves a machine that attempts to build the string "Hello, World!" by querying an LLM one character at a time. It showcases the core components of the stack, including:
+- Using a `FlatMachine` from YAML configuration.
 - Tracking execution statistics like cost and API calls.
 
 ## Prerequisites

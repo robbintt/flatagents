@@ -22,7 +22,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from flatagents import FlatMachine, setup_logging, get_logger
+from flatmachines import FlatMachine, setup_logging, get_logger
 
 setup_logging(level='INFO')
 logger = get_logger(__name__)

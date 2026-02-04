@@ -15,7 +15,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flatagents import MachineHooks, FlatAgent, get_logger
+from flatmachines import MachineHooks
+from flatagents import FlatAgent, get_logger
 from .card_parser import parse_card
 
 logger = get_logger(__name__)

@@ -1,10 +1,11 @@
 [project]
 name = "rlm-example"
 version = "0.1.0"
-description = "Recursive Language Model (RLM) example using FlatAgents - handles arbitrarily long contexts via REPL exploration"
+description = "Recursive Language Model (RLM) example using FlatMachines - handles arbitrarily long contexts via REPL exploration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "flatmachines[flatagents]",
     "flatagents[litellm]",
 ]
 

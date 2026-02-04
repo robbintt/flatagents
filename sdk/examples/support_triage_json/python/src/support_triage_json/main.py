@@ -14,7 +14,7 @@ Usage:
 import asyncio
 from pathlib import Path
 
-from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
+from flatmachines import FlatMachine, LoggingHooks, setup_logging, get_logger
 
 # Configure logging
 setup_logging(level="INFO")

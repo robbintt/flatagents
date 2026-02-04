@@ -20,7 +20,7 @@ from pathlib import Path
 from decimal import Decimal
 from typing import Dict, Any, Optional
 
-from flatagents import FlatMachine, setup_logging, get_logger
+from flatmachines import FlatMachine, setup_logging, get_logger
 from .hooks import HumanInLoopHooks
 
 # Configure logging

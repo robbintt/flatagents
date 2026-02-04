@@ -2,7 +2,7 @@
 name = "error_handling"
 version = "0.1.0"
 description = "Error handling demo with cleanup agent."
-dependencies = ["flatagents[litellm]"]
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
 requires-python = ">=3.10"
 
 [build-system]

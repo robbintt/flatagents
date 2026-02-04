@@ -15,7 +15,7 @@ import sys
 # Add src to path for local imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from flatagents import FlatMachine, get_logger
+from flatmachines import FlatMachine, get_logger
 from dynamic_agent.hooks import OTFAgentHooks
 
 logger = get_logger(__name__)

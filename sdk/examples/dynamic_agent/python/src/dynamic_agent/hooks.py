@@ -9,7 +9,8 @@ Provides:
 import json
 import asyncio
 from typing import Any, Dict
-from flatagents import MachineHooks, FlatAgent, get_logger
+from flatmachines import MachineHooks
+from flatagents import FlatAgent, get_logger
 
 # Allow nested event loops for running async code from sync hooks
 import nest_asyncio

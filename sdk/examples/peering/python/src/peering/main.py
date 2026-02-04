@@ -13,7 +13,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from flatagents import FlatMachine, InMemoryResultBackend, MemoryBackend, setup_logging, get_logger
+from flatmachines import FlatMachine, InMemoryResultBackend, MemoryBackend, setup_logging, get_logger
 
 # Configure logging
 setup_logging(level="INFO")

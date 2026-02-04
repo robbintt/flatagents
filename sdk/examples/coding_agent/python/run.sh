@@ -28,6 +28,8 @@ cd "$SCRIPT_DIR"
 
 # Calculate relative path to SDK root
 SDK_ROOT="$SCRIPT_DIR/../../.."
+FLATAGENTS_SDK_PATH="$SDK_ROOT/python/flatagents"
+FLATMACHINES_SDK_PATH="$SDK_ROOT/python/flatmachines"
 
 # Check if --cwd was provided, if not add original cwd
 CWD_PROVIDED=false
@@ -55,9 +57,13 @@ fi
 
 # Install flatagents
 if [ "$LOCAL_INSTALL" = true ]; then
+    [ "$QUIET" = false ] && echo "Installing local flatmachines..."
+    uv pip install $PIP_QUIET --python "$VENV_PATH/bin/python" -e "$FLATMACHINES_SDK_PATH[flatagents]"
     [ "$QUIET" = false ] && echo "Installing local flatagents..."
-    uv pip install $PIP_QUIET --python "$VENV_PATH/bin/python" -e "$SDK_ROOT/python[litellm]"
+    uv pip install $PIP_QUIET --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_SDK_PATH[litellm]"
 else
+    [ "$QUIET" = false ] && echo "Installing flatmachines from PyPI..."
+    uv pip install $PIP_QUIET --python "$VENV_PATH/bin/python" "flatmachines[flatagents]"
     [ "$QUIET" = false ] && echo "Installing flatagents from PyPI..."
     uv pip install $PIP_QUIET --python "$VENV_PATH/bin/python" "flatagents[litellm]"
 fi
