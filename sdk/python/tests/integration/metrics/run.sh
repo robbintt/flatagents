@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SDK_DIR="$SCRIPT_DIR/../../.."
+FLATAGENTS_DIR="$SCRIPT_DIR/../../../flatagents"
 VENV_PATH="$SCRIPT_DIR/.venv"
 
 # --- Parse Arguments ---
@@ -34,7 +34,7 @@ fi
 # Install with metrics extras
 echo "Installing flatagents[metrics]..."
 if [ "$LOCAL_INSTALL" = true ]; then
-    uv pip install --python "$VENV_PATH/bin/python" -e "$SDK_DIR[metrics]" -q
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_DIR[metrics]" -q
 else
     uv pip install --python "$VENV_PATH/bin/python" "flatagents[metrics]" -q
 fi

@@ -26,7 +26,7 @@
  * name               - Machine identifier
  * expression_engine  - "simple" (default) or "cel"
  * context            - Initial context values (Jinja2 templates)
- * agents             - Map of agent name to config file path or inline config
+ * agents             - Map of agent name to AgentRef (path, inline config, or typed adapter ref)
  * machines           - Map of machine name to config file path or inline config
  * states             - Map of state name to state definition
  * settings           - Optional settings (hooks, etc.)
@@ -269,13 +269,21 @@ export interface MachineData {
   name?: string;
   expression_engine?: "simple" | "cel";
   context?: Record<string, any>;
-  agents?: Record<string, string | AgentWrapper>;
+  agents?: Record<string, AgentRef>;
   machines?: Record<string, string | MachineWrapper>;
   states: Record<string, StateDefinition>;
   settings?: MachineSettings;
   persistence?: PersistenceConfig;
   hooks?: HooksConfig;
 }
+
+export interface AgentRefConfig {
+  type: string;
+  ref?: string;
+  config?: Record<string, any>;
+}
+
+export type AgentRef = string | AgentWrapper | AgentRefConfig;
 
 /**
  * Configuration for loading hooks from file or module.

@@ -171,7 +171,7 @@ Use `enum: [...]` to constrain string values.
 For orchestration, use FlatMachine ([full docs in MACHINES.md](./MACHINES.md)):
 
 ```python
-from flatagents import FlatMachine
+from flatmachines import FlatMachine
 
 machine = FlatMachine(config_file="workflow.yml")
 result = await machine.execute(input={"query": "..."})
@@ -247,7 +247,7 @@ agent = FlatAgent(config_file="agent.yml", backend=backend)
 Extend machine behavior with Python hooks:
 
 ```python
-from flatagents import FlatMachine, MachineHooks
+from flatmachines import FlatMachine, MachineHooks
 
 class CustomHooks(MachineHooks):
     def on_state_enter(self, state: str, context: dict) -> dict:
@@ -283,7 +283,8 @@ execution:
 ### Schema Validation
 
 ```python
-from flatagents import validate_flatagent_config, validate_flatmachine_config
+from flatagents import validate_flatagent_config
+from flatmachines import validate_flatmachine_config
 
 warnings = validate_flatagent_config(config)
 warnings = validate_flatmachine_config(config)

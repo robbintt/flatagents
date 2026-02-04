@@ -1,5 +1,5 @@
 """
-FlatMachine - State machine orchestration for FlatAgents.
+FlatMachine - State machine orchestration for agents.
 
 A machine defines how agents are connected and executed:
 states, transitions, conditions, and loops.
@@ -30,7 +30,14 @@ from .utils import check_spec_version
 from .expressions import get_expression_engine, ExpressionEngine
 from .execution import get_execution_type, ExecutionType
 from .hooks import MachineHooks, LoggingHooks
-from .flatagent import FlatAgent
+from .agents import (
+    AgentAdapterContext,
+    AgentAdapterRegistry,
+    AgentExecutor,
+    AgentResult,
+    coerce_agent_result,
+    normalize_agent_ref,
+)
 
 import uuid
 from .persistence import (
@@ -61,11 +68,11 @@ logger = get_logger(__name__)
 
 class FlatMachine:
     """
-    State machine orchestration for FlatAgents.
-    
+    State machine orchestration for agents.
+
     Executes a sequence of states, evaluations transitions and
     managing context flow between agents.
-    
+
     Supports:
     - Persistence (checkpoint/resume)
     - Concurrency control (locking)
@@ -81,6 +88,8 @@ class FlatMachine:
         lock: Optional[ExecutionLock] = None,
         invoker: Optional[MachineInvoker] = None,
         result_backend: Optional[ResultBackend] = None,
+        agent_registry: Optional[AgentAdapterRegistry] = None,
+        agent_adapters: Optional[list] = None,
         profiles_file: Optional[str] = None,
         **kwargs
     ):
@@ -95,7 +104,9 @@ class FlatMachine:
             lock: Concurrency lock (overrides config)
             invoker: Strategy for invoking other machines
             result_backend: Backend for inter-machine result storage
-            profiles_file: Path to profiles.yml for model profile resolution
+            agent_registry: Registry of agent adapters (optional)
+            agent_adapters: List of agent adapters to register (optional)
+            profiles_file: Optional profiles.yml path for adapters that use it
             **kwargs: Override config values
         """
         if Template is None:
@@ -108,8 +119,8 @@ class FlatMachine:
         # Extract _config_dir override (used for launched machines)
         config_dir_override = kwargs.pop('_config_dir', None)
 
-        # Store parent profiles (fallback for dynamic machines with no profiles.yml)
-        parent_profiles_dict = kwargs.pop('_profiles_dict', None)
+        # Adapter-specific profile hints (optional, used by adapter implementations)
+        self._profiles_dict = kwargs.pop('_profiles_dict', None)
         self._profiles_file = profiles_file or kwargs.pop('_profiles_file', None)
 
         self._load_config(config_file, config_dict)
@@ -117,12 +128,6 @@ class FlatMachine:
         # Allow launcher to override config_dir for launched machines
         if config_dir_override:
             self._config_dir = config_dir_override
-
-        # Always discover own profiles first; own wins, parent is fallback only
-        from .profiles import discover_profiles_file, load_profiles_from_file, resolve_profiles_with_fallback
-        self._profiles_file = discover_profiles_file(self._config_dir, self._profiles_file)
-        own_profiles_dict = load_profiles_from_file(self._profiles_file) if self._profiles_file else None
-        self._profiles_dict = resolve_profiles_with_fallback(own_profiles_dict, parent_profiles_dict)
 
         # Merge kwargs into config data (shallow merge)
         if kwargs and 'data' in self.config:
@@ -157,8 +162,17 @@ class FlatMachine:
         # Hooks - load from config or use provided/default
         self._hooks = self._load_hooks(hooks)
 
-        # Agent cache
-        self._agents: Dict[str, FlatAgent] = {}
+        # Agent adapter registry
+        if agent_registry is not None:
+            self._agent_registry = agent_registry
+        elif agent_adapters:
+            self._agent_registry = AgentAdapterRegistry(agent_adapters)
+        else:
+            from .adapters import create_registry
+            self._agent_registry = create_registry()
+
+        # Agent executor cache
+        self._agents: Dict[str, AgentExecutor] = {}
 
         # Execution tracking
         self.total_api_calls = 0
@@ -180,6 +194,10 @@ class FlatMachine:
         self.invoker = invoker or InlineInvoker()
 
         logger.info(f"Initialized FlatMachine: {self.machine_name} (ID: {self.execution_id})")
+
+    @property
+    def agent_registry(self) -> AgentAdapterRegistry:
+        return self._agent_registry
 
     def _initialize_persistence(
         self,
@@ -422,29 +440,33 @@ class FlatMachine:
             logger.error(f"DISTRIBUTED hooks failed ({module_name}.{class_name}): {e}")
         return None
 
-    def _get_agent(self, agent_name: str) -> FlatAgent:
-        """Get or load an agent by name."""
+    def _get_executor(self, agent_name: str) -> AgentExecutor:
+        """Get or load an agent executor by name."""
         if agent_name in self._agents:
             return self._agents[agent_name]
 
         if agent_name not in self.agent_refs:
             raise ValueError(f"Unknown agent: {agent_name}")
 
-        agent_ref = self.agent_refs[agent_name]
+        raw_ref = self.agent_refs[agent_name]
+        agent_ref = normalize_agent_ref(raw_ref)
 
-        # Handle file path reference
-        if isinstance(agent_ref, str):
-            if not os.path.isabs(agent_ref):
-                agent_ref = os.path.join(self._config_dir, agent_ref)
-            agent = FlatAgent(config_file=agent_ref, profiles_dict=self._profiles_dict)
-        # Handle inline config (dict)
-        elif isinstance(agent_ref, dict):
-            agent = FlatAgent(config_dict=agent_ref, profiles_dict=self._profiles_dict)
-        else:
-            raise ValueError(f"Invalid agent reference: {agent_ref}")
+        adapter_context = AgentAdapterContext(
+            config_dir=self._config_dir,
+            settings=self.settings,
+            machine_name=self.machine_name,
+            profiles_file=self._profiles_file,
+            profiles_dict=self._profiles_dict,
+        )
 
-        self._agents[agent_name] = agent
-        return agent
+        executor = self._agent_registry.create_executor(
+            agent_name=agent_name,
+            agent_ref=agent_ref,
+            context=adapter_context,
+        )
+
+        self._agents[agent_name] = executor
+        return executor
 
     # Pattern for simple path references: output.foo, context.bar.baz, input.x
     _PATH_PATTERN = re.compile(r'^(output|context|input)(\.[a-zA-Z_][a-zA-Z0-9_]*)+$')
@@ -694,10 +716,12 @@ class FlatMachine:
         peer = FlatMachine(
             config_dict=target_config,
             result_backend=self.result_backend,
+            agent_registry=self.agent_registry,
             _config_dir=peer_config_dir,
             _execution_id=child_id,
             _parent_execution_id=self.execution_id,
             _profiles_dict=self._profiles_dict,
+            _profiles_file=self._profiles_file,
         )
 
         try:
@@ -1012,23 +1036,18 @@ class FlatMachine:
         # 4. Handle 'agent' (LLM execution)
         agent_name = state.get('agent')
         if agent_name:
-            agent = self._get_agent(agent_name)
+            executor = self._get_executor(agent_name)
             input_spec = state.get('input', {})
             variables = {"context": context, "input": context}
             agent_input = self._render_dict(input_spec, variables)
 
-            pre_calls = agent.total_api_calls
-            pre_cost = agent.total_cost
-
             execution_config = state.get('execution')
             execution_type = get_execution_type(execution_config)
-            output = await execution_type.execute(agent, agent_input)
+            result = await execution_type.execute(executor, agent_input, context=context)
+            agent_result = coerce_agent_result(result)
+            output = agent_result.output_payload()
 
-            self.total_api_calls += agent.total_api_calls - pre_calls
-            self.total_cost += agent.total_cost - pre_cost
-
-            if output is None:
-                output = {}
+            self._accumulate_agent_metrics(agent_result)
 
             output_mapping = state.get('output_to_context', {})
             if output_mapping:
@@ -1044,6 +1063,28 @@ class FlatMachine:
                 output = self._render_dict(output_spec, variables)
 
         return context, output
+
+    def _accumulate_agent_metrics(self, result: AgentResult) -> None:
+        """Accumulate usage/cost from an AgentResult."""
+        if result.cost is not None:
+            self.total_cost += result.cost
+
+        usage = result.usage or {}
+        if isinstance(usage, dict):
+            api_calls = usage.get("api_calls")
+            if api_calls is None:
+                api_calls = usage.get("requests") or usage.get("calls")
+            if api_calls:
+                self.total_api_calls += api_calls
+
+            if result.cost is None:
+                cost = usage.get("cost")
+                if isinstance(cost, (int, float)):
+                    self.total_cost += cost
+                elif isinstance(cost, dict):
+                    total = cost.get("total")
+                    if isinstance(total, (int, float)):
+                        self.total_cost += total
 
     async def _save_checkpoint(
         self,
@@ -1127,9 +1168,6 @@ class FlatMachine:
                 variables = {"input": input}
                 context = self._render_dict(self.initial_context, variables)
 
-                # Inject profiles dict for hooks that create dynamic agents
-                if self._profiles_dict:
-                    context['_profiles'] = self._profiles_dict
 
                 await self._save_checkpoint('machine_start', 'start', step, context)
                 context = await self._run_hook('on_machine_start', context)

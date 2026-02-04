@@ -2,7 +2,7 @@
 name = "flatagents_persistence_tests"
 version = "0.1.0"
 description = "Integration tests for FlatMachine persistence features"
-dependencies = ["flatagents[litellm]", "pytest", "pytest-asyncio"]
+dependencies = ["flatagents[litellm]", "flatmachines[flatagents]", "pytest", "pytest-asyncio"]
 requires-python = ">=3.10"
 
 [build-system]

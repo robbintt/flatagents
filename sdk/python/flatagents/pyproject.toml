@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "flatagents"
 version = "0.10.0"
-description = "A lightweight framework for building LLM-powered agents and composable state machines with pluggable backends."
+description = "A lightweight framework for building LLM-powered agents."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -29,19 +29,44 @@ dependencies = ["pyyaml", "jinja2", "aiofiles", "httpx"]
 [project.optional-dependencies]
 litellm = ["litellm"]
 aisuite = ["aisuite[all]"]
-cel = ["cel-python"]
 validation = ["jsonschema>=4.0"]
 metrics = [
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
 ]
+orchestration = ["flatmachines>=0.10.0"]
 # Local development (no cloud dependencies)
-local = ["litellm", "aisuite[all]", "cel-python", "jsonschema>=4.0", "opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"]
+local = [
+    "litellm",
+    "aisuite[all]",
+    "jsonschema>=4.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "flatmachines>=0.10.0",
+]
 # Alias for local
-all = ["litellm", "aisuite[all]", "cel-python", "jsonschema>=4.0", "opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"]
+all = [
+    "litellm",
+    "aisuite[all]",
+    "jsonschema>=4.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "flatmachines>=0.10.0",
+]
 # GCP deployment (local + Firestore)
-gcp = ["litellm", "aisuite[all]", "cel-python", "jsonschema>=4.0", "opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0", "google-cloud-firestore>=2.11.0"]
+gcp = [
+    "litellm",
+    "aisuite[all]",
+    "jsonschema>=4.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "google-cloud-firestore>=2.11.0",
+    "flatmachines>=0.10.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/memgrafter/flatagents"

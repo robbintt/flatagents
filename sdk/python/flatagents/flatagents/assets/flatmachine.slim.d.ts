@@ -9,13 +9,19 @@ export interface MachineData {
     name?: string;
     expression_engine?: "simple" | "cel";
     context?: Record<string, any>;
-    agents?: Record<string, string | AgentWrapper>;
+    agents?: Record<string, AgentRef>;
     machines?: Record<string, string | MachineWrapper>;
     states: Record<string, StateDefinition>;
     settings?: MachineSettings;
     persistence?: PersistenceConfig;
     hooks?: HooksConfig;
 }
+export interface AgentRefConfig {
+    type: string;
+    ref?: string;
+    config?: Record<string, any>;
+}
+export type AgentRef = string | AgentWrapper | AgentRefConfig;
 export interface HooksConfig {
     file?: string;
     module?: string;

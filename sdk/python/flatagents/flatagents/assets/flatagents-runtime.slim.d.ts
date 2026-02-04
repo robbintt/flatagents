@@ -17,8 +17,20 @@ export interface ResultBackend {
     exists(uri: string): Promise<boolean>;
     delete(uri: string): Promise<void>;
 }
+export interface AgentResult {
+    output?: Record<string, any> | null;
+    content?: string | null;
+    raw?: any;
+    usage?: Record<string, any> | null;
+    cost?: number | null;
+    metadata?: Record<string, any> | null;
+}
+export interface AgentExecutor {
+    execute(input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
+    metadata?: Record<string, any>;
+}
 export interface ExecutionType {
-    execute<T>(fn: () => Promise<T>): Promise<T>;
+    execute(executor: AgentExecutor, input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
 }
 export interface ExecutionConfig {
     type: "default" | "retry" | "parallel" | "mdap_voting";

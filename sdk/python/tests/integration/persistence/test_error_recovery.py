@@ -8,8 +8,7 @@ import asyncio
 import os
 import shutil
 import pytest
-from flatagents.flatmachine import FlatMachine
-from flatagents.hooks import MachineHooks
+from flatmachines import FlatMachine, MachineHooks
 
 
 class ErrorRecoveryHooks(MachineHooks):

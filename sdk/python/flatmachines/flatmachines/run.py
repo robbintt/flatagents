@@ -1,8 +1,8 @@
 """
-FlatAgents CLI Runner.
+FlatMachines CLI Runner.
 
 Entry point for running machines via subprocess:
-    python -m flatagents.run --config machine.yml --input '{"key": "value"}'
+    python -m flatmachines.run --config machine.yml --input '{"key": "value"}'
 
 Used by SubprocessInvoker for fire-and-forget machine execution.
 """
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(
         description="Run a FlatMachine from the command line",
-        prog="python -m flatagents.run"
+        prog="python -m flatmachines.run"
     )
     parser.add_argument(
         "--config", "-c",

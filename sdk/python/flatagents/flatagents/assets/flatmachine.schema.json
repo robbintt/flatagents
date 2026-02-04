@@ -51,6 +51,9 @@
               },
               {
                 "$ref": "#/definitions/AgentWrapper"
+              },
+              {
+                "$ref": "#/definitions/AgentRefConfig"
               }
             ]
           }
@@ -110,6 +113,24 @@
         "spec",
         "spec_version",
         "data"
+      ],
+      "additionalProperties": false
+    },
+    "AgentRefConfig": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type"
       ],
       "additionalProperties": false
     },

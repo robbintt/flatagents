@@ -10,9 +10,8 @@ Tests:
 import json
 import logging
 import pytest
-from flatagents.flatmachine import FlatMachine
-from flatagents.persistence import CheckpointManager, MemoryBackend
-from flatagents.utils import strip_markdown_json
+from flatmachines import FlatMachine, CheckpointManager, MemoryBackend
+from flatmachines.utils import strip_markdown_json
 
 
 def get_minimal_config():

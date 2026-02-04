@@ -27,9 +27,11 @@ fi
 
 # 2. Install Dependencies
 echo "Installing dependencies..."
+echo "  - Installing flatmachines from local source..."
+uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../../flatmachines[flatagents]"
+
 echo "  - Installing flatagents from local source..."
-# Go up to sdk/python level
-uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../../.[litellm]"
+uv pip install --python "$VENV_PATH/bin/python" -e "$SCRIPT_DIR/../../flatagents[litellm]"
 
 echo "  - Installing test dependencies..."
 uv pip install --python "$VENV_PATH/bin/python" pytest pytest-asyncio

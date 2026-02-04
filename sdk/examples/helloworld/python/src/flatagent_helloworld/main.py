@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
+from flatmachines import FlatMachine, LoggingHooks, setup_logging, get_logger
 
 # Configure logging for the entire application
 setup_logging(level='INFO')

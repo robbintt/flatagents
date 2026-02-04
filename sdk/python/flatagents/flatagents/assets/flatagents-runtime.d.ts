@@ -181,14 +181,25 @@ export interface ResultBackend {
     delete(uri: string): Promise<void>;
 }
 
+export interface AgentResult {
+    output?: Record<string, any> | null;
+    content?: string | null;
+    raw?: any;
+    usage?: Record<string, any> | null;
+    cost?: number | null;
+    metadata?: Record<string, any> | null;
+}
+
+export interface AgentExecutor {
+    execute(input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
+    metadata?: Record<string, any>;
+}
+
 export interface ExecutionType {
     /**
-     * Execute a function with this strategy.
-     *
-     * @param fn - The async function to execute (typically agent.call)
-     * @returns The result(s) according to strategy
+     * Execute an agent with this strategy.
      */
-    execute<T>(fn: () => Promise<T>): Promise<T>;
+    execute(executor: AgentExecutor, input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
 }
 
 export interface ExecutionConfig {

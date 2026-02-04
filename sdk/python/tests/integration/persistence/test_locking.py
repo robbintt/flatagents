@@ -8,9 +8,7 @@ import asyncio
 import os
 import shutil
 import pytest
-from flatagents.flatmachine import FlatMachine
-from flatagents.hooks import MachineHooks
-from flatagents.locking import LocalFileLock, NoOpLock
+from flatmachines import FlatMachine, MachineHooks, LocalFileLock, NoOpLock
 
 
 @pytest.fixture(autouse=True)

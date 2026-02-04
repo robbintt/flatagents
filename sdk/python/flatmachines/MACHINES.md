@@ -1,4 +1,4 @@
-# FlatAgents + FlatMachines Reference
+# FlatMachines Reference
 
 > **Target: <1000 tokens.** LLM-optimized. See `flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts` for schemas.
 >
