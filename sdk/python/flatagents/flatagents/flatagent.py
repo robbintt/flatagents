@@ -29,6 +29,14 @@ from .baseagent import (
     MCPToolProvider,
     AgentResponse,
     ToolCall,
+    UsageInfo,
+    RateLimitInfo,
+    ErrorInfo,
+    extract_headers_from_response,
+    extract_headers_from_error,
+    extract_rate_limit_info,
+    extract_status_code,
+    is_retryable_error,
 )
 
 logger = get_logger(__name__)
@@ -649,10 +657,8 @@ class FlatAgent:
             **input_data: Input values available as {{ input.* }} in templates
 
         Returns:
-            AgentResponse with content, output, and optionally tool_calls
+            AgentResponse with content, output, error info, and rate limits
         """
-        from .baseagent import AgentResponse, ToolCall
-
         # Use provided tool provider or fall back to stored one
         if tool_provider is not None:
             self._tool_provider = tool_provider
@@ -730,79 +736,86 @@ class FlatAgent:
         input_tokens = 0
         output_tokens = 0
         estimated_cost = 0.0
+        response = None
+        error_info = None
+        rate_limit_info = None
+        usage_info = None
+        
         with AgentMonitor(
             self.agent_name,
             extra_attributes={"model": self.model, "backend": self._backend}
         ) as monitor:
-            response = await self._call_llm(params)
-            
-            # Extract token usage
-            if hasattr(response, 'usage') and response.usage:
-                input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
-                output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
-                estimated_cost = (input_tokens * 0.001 + output_tokens * 0.002) / 1000
-                monitor.metrics["tokens"] = input_tokens + output_tokens
-                monitor.metrics["input_tokens"] = input_tokens
-                monitor.metrics["output_tokens"] = output_tokens
-                monitor.metrics["cost"] = estimated_cost
-            
-            # Extract rate limit headers from LiteLLM response
-            # LiteLLM stores these in _hidden_params or _response_headers
-            response_headers = {}
-            if hasattr(response, '_response_headers') and response._response_headers:
-                response_headers = response._response_headers
-            elif hasattr(response, '_hidden_params') and response._hidden_params:
-                response_headers = response._hidden_params.get('additional_headers', {})
-            
-            # Parse rate limit headers (providers use various naming conventions)
-            def _parse_int_header(headers, *keys):
-                for key in keys:
-                    val = headers.get(key) or headers.get(key.lower())
-                    if val is not None:
-                        try:
-                            return int(val)
-                        except (ValueError, TypeError):
-                            pass
-                return None
-            
-            remaining_requests = _parse_int_header(
-                response_headers,
-                'x-ratelimit-remaining-requests',
-                'x-rate-limit-remaining-requests',
-                'ratelimit-remaining'
-            )
-            remaining_tokens = _parse_int_header(
-                response_headers,
-                'x-ratelimit-remaining-tokens',
-                'x-rate-limit-remaining-tokens'
-            )
-            limit_requests = _parse_int_header(
-                response_headers,
-                'x-ratelimit-limit-requests',
-                'x-rate-limit-limit-requests',
-                'ratelimit-limit'
-            )
-            limit_tokens = _parse_int_header(
-                response_headers,
-                'x-ratelimit-limit-tokens',
-                'x-rate-limit-limit-tokens'
-            )
-            
-            if remaining_requests is not None:
-                monitor.metrics["ratelimit_remaining_requests"] = remaining_requests
-            if remaining_tokens is not None:
-                monitor.metrics["ratelimit_remaining_tokens"] = remaining_tokens
-            if limit_requests is not None:
-                monitor.metrics["ratelimit_limit_requests"] = limit_requests
-            if limit_tokens is not None:
-                monitor.metrics["ratelimit_limit_tokens"] = limit_tokens
+            try:
+                response = await self._call_llm(params)
+                
+                # Extract token usage from successful response
+                if hasattr(response, 'usage') and response.usage:
+                    input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
+                    output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
+                    estimated_cost = (input_tokens * 0.001 + output_tokens * 0.002) / 1000
+                    usage_info = UsageInfo(
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=input_tokens + output_tokens,
+                        estimated_cost=estimated_cost
+                    )
+                    monitor.metrics["tokens"] = input_tokens + output_tokens
+                    monitor.metrics["input_tokens"] = input_tokens
+                    monitor.metrics["output_tokens"] = output_tokens
+                    monitor.metrics["cost"] = estimated_cost
+                
+                # Extract rate limit headers from successful response
+                response_headers = extract_headers_from_response(response)
+                if response_headers:
+                    rate_limit_info = extract_rate_limit_info(response_headers)
+                    self._record_rate_limit_metrics(monitor, rate_limit_info)
+                    
+            except Exception as e:
+                # Extract headers and status from error
+                error_headers = extract_headers_from_error(e)
+                status_code = extract_status_code(e)
+                rate_limit_info = extract_rate_limit_info(error_headers) if error_headers else None
+                retryable = is_retryable_error(e, status_code)
+                
+                error_info = ErrorInfo(
+                    error_type=type(e).__name__,
+                    message=str(e),
+                    status_code=status_code,
+                    headers=error_headers if error_headers else None,
+                    rate_limit=rate_limit_info,
+                    retryable=retryable
+                )
+                
+                # Record error metrics
+                monitor.metrics["error"] = True
+                monitor.metrics["error_type"] = error_info.error_type
+                if status_code:
+                    monitor.metrics["status_code"] = status_code
+                if rate_limit_info:
+                    self._record_rate_limit_metrics(monitor, rate_limit_info)
+                    if rate_limit_info.is_limited():
+                        monitor.metrics["rate_limited"] = True
+                        monitor.metrics["rate_limit_cause"] = rate_limit_info.get_limit_cause()
+                
+                logger.warning(
+                    f"LLM call failed: {error_info.error_type} - {error_info.message[:100]}"
+                    + (f" (status={status_code})" if status_code else "")
+                    + (f" [rate_limit={rate_limit_info.get_limit_cause()}]" if rate_limit_info and rate_limit_info.is_limited() else "")
+                )
+                
+                # Return error response instead of raising
+                return AgentResponse(
+                    error=error_info,
+                    rate_limit=rate_limit_info,
+                    raw_response=getattr(e, 'response', None)
+                )
 
         # Track usage
         self.total_api_calls += 1
         if input_tokens or output_tokens:
             self.total_cost += estimated_cost
 
-        # Extract response
+        # Extract response content
         message = response.choices[0].message
         content = message.content
 
@@ -840,8 +853,34 @@ class FlatAgent:
             content=content,
             output=output,
             tool_calls=tool_calls,
-            raw_response=response
+            raw_response=response,
+            usage=usage_info,
+            rate_limit=rate_limit_info
         )
+    
+    def _record_rate_limit_metrics(self, monitor: "AgentMonitor", rate_limit: "RateLimitInfo") -> None:
+        """Record rate limit info to metrics."""
+        if rate_limit.remaining_requests is not None:
+            monitor.metrics["ratelimit_remaining_requests"] = rate_limit.remaining_requests
+        if rate_limit.remaining_tokens is not None:
+            monitor.metrics["ratelimit_remaining_tokens"] = rate_limit.remaining_tokens
+        if rate_limit.limit_requests is not None:
+            monitor.metrics["ratelimit_limit_requests"] = rate_limit.limit_requests
+        if rate_limit.limit_tokens is not None:
+            monitor.metrics["ratelimit_limit_tokens"] = rate_limit.limit_tokens
+        # Time-based limits
+        if rate_limit.remaining_requests_day is not None:
+            monitor.metrics["ratelimit_remaining_requests_day"] = rate_limit.remaining_requests_day
+        if rate_limit.remaining_requests_hour is not None:
+            monitor.metrics["ratelimit_remaining_requests_hour"] = rate_limit.remaining_requests_hour
+        if rate_limit.remaining_requests_minute is not None:
+            monitor.metrics["ratelimit_remaining_requests_minute"] = rate_limit.remaining_requests_minute
+        if rate_limit.remaining_tokens_day is not None:
+            monitor.metrics["ratelimit_remaining_tokens_day"] = rate_limit.remaining_tokens_day
+        if rate_limit.remaining_tokens_hour is not None:
+            monitor.metrics["ratelimit_remaining_tokens_hour"] = rate_limit.remaining_tokens_hour
+        if rate_limit.remaining_tokens_minute is not None:
+            monitor.metrics["ratelimit_remaining_tokens_minute"] = rate_limit.remaining_tokens_minute
 
     def call_sync(
         self,

@@ -18,6 +18,16 @@ from .baseagent import (
     MCPToolProvider,
     ToolCall,
     AgentResponse,
+    # Response data classes
+    UsageInfo,
+    RateLimitInfo,
+    ErrorInfo,
+    # Header extraction utilities
+    extract_headers_from_response,
+    extract_headers_from_error,
+    extract_rate_limit_info,
+    extract_status_code,
+    is_retryable_error,
 )
 from .flatagent import FlatAgent
 from .profiles import (
@@ -59,6 +69,16 @@ __all__ = [
     "MCPToolProvider",
     "ToolCall",
     "AgentResponse",
+    # Response data classes
+    "UsageInfo",
+    "RateLimitInfo",
+    "ErrorInfo",
+    # Header extraction utilities
+    "extract_headers_from_response",
+    "extract_headers_from_error",
+    "extract_rate_limit_info",
+    "extract_status_code",
+    "is_retryable_error",
     # Validation
     "validate_flatagent_config",
     "get_flatagent_schema",

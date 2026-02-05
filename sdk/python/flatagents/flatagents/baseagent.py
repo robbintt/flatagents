@@ -8,7 +8,9 @@ LLM interaction is delegated to an LLMBackend, allowing different providers.
 import asyncio
 import os
 import random
+import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any, Tuple, Callable, List, Dict, Optional, Protocol, runtime_checkable
 
 from .monitoring import get_logger, track_operation
@@ -563,20 +565,276 @@ class ToolCall:
 
 
 @dataclass
+@dataclass
+class UsageInfo:
+    """Token usage information from an LLM call."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float = 0.0
+
+
+@dataclass
+class RateLimitInfo:
+    """Rate limit information extracted from response headers."""
+    # Remaining before limit
+    remaining_requests: Optional[int] = None
+    remaining_tokens: Optional[int] = None
+    # Limits
+    limit_requests: Optional[int] = None
+    limit_tokens: Optional[int] = None
+    # Time-based (Cerebras-style)
+    remaining_requests_minute: Optional[int] = None
+    remaining_requests_hour: Optional[int] = None
+    remaining_requests_day: Optional[int] = None
+    remaining_tokens_minute: Optional[int] = None
+    remaining_tokens_hour: Optional[int] = None
+    remaining_tokens_day: Optional[int] = None
+    # Retry info
+    retry_after: Optional[int] = None
+    
+    def is_limited(self) -> bool:
+        """Check if any rate limit is exhausted (remaining == 0)."""
+        for field in [
+            self.remaining_requests, self.remaining_tokens,
+            self.remaining_requests_minute, self.remaining_requests_hour, self.remaining_requests_day,
+            self.remaining_tokens_minute, self.remaining_tokens_hour, self.remaining_tokens_day,
+        ]:
+            if field == 0:
+                return True
+        return False
+    
+    def get_limit_cause(self) -> Optional[str]:
+        """Get the cause of rate limiting (day > hour > minute > general)."""
+        if self.remaining_requests_day == 0 or self.remaining_tokens_day == 0:
+            return "day"
+        if self.remaining_requests_hour == 0 or self.remaining_tokens_hour == 0:
+            return "hour"
+        if self.remaining_requests_minute == 0 or self.remaining_tokens_minute == 0:
+            return "minute"
+        if self.remaining_requests == 0 or self.remaining_tokens == 0:
+            return "general"
+        return None
+
+
+@dataclass 
+class ErrorInfo:
+    """Error information from a failed LLM call."""
+    error_type: str
+    message: str
+    status_code: Optional[int] = None
+    headers: Optional[Dict[str, str]] = None
+    rate_limit: Optional[RateLimitInfo] = None
+    retryable: bool = False
+
+
+@dataclass
 class AgentResponse:
     """
     Response from an agent call.
 
     Attributes:
-        content: Raw text content from LLM (may be None if only tool calls)
+        content: Raw text content from LLM (may be None if only tool calls or error)
         output: Parsed output according to output schema (if defined)
         tool_calls: List of tool calls requested by LLM (if any)
         raw_response: Raw LLM response object for advanced use cases
+        usage: Token usage information
+        rate_limit: Rate limit info from response headers
+        error: Error information if call failed (None on success)
+        success: Whether the call succeeded
     """
     content: Optional[str] = None
     output: Optional[Dict[str, Any]] = None
     tool_calls: Optional[List[ToolCall]] = None
     raw_response: Optional[Any] = None
+    usage: Optional[UsageInfo] = None
+    rate_limit: Optional[RateLimitInfo] = None
+    error: Optional[ErrorInfo] = None
+    
+    @property
+    def success(self) -> bool:
+        """Whether the call succeeded (no error)."""
+        return self.error is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Header Extraction Utilities
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _normalize_headers(raw_headers: Optional[Any]) -> Dict[str, str]:
+    """Normalize headers to lowercase string dict."""
+    if raw_headers is None:
+        return {}
+    
+    if isinstance(raw_headers, dict):
+        items = raw_headers.items()
+    elif hasattr(raw_headers, "items"):
+        items = raw_headers.items()
+    elif isinstance(raw_headers, (list, tuple)):
+        items = raw_headers
+    else:
+        return {}
+    
+    normalized: Dict[str, str] = {}
+    for key, value in items:
+        if key is None:
+            continue
+        key_text = str(key).lower()
+        if isinstance(value, (list, tuple)):
+            value_text = ",".join(str(item) for item in value)
+        else:
+            value_text = str(value)
+        normalized[key_text] = value_text
+    
+    return normalized
+
+
+def _parse_int_header(headers: Dict[str, str], *keys) -> Optional[int]:
+    """Parse an integer header value, trying multiple key variants."""
+    for key in keys:
+        val = headers.get(key) or headers.get(key.lower())
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+    return None
+
+
+def extract_rate_limit_info(headers: Dict[str, str]) -> RateLimitInfo:
+    """Extract rate limit information from response headers."""
+    return RateLimitInfo(
+        # General rate limits
+        remaining_requests=_parse_int_header(
+            headers, 'x-ratelimit-remaining-requests', 'ratelimit-remaining'
+        ),
+        remaining_tokens=_parse_int_header(
+            headers, 'x-ratelimit-remaining-tokens'
+        ),
+        limit_requests=_parse_int_header(
+            headers, 'x-ratelimit-limit-requests', 'ratelimit-limit'
+        ),
+        limit_tokens=_parse_int_header(
+            headers, 'x-ratelimit-limit-tokens'
+        ),
+        # Cerebras-style time-based limits
+        remaining_requests_minute=_parse_int_header(
+            headers, 'x-ratelimit-remaining-requests-minute'
+        ),
+        remaining_requests_hour=_parse_int_header(
+            headers, 'x-ratelimit-remaining-requests-hour'
+        ),
+        remaining_requests_day=_parse_int_header(
+            headers, 'x-ratelimit-remaining-requests-day'
+        ),
+        remaining_tokens_minute=_parse_int_header(
+            headers, 'x-ratelimit-remaining-tokens-minute'
+        ),
+        remaining_tokens_hour=_parse_int_header(
+            headers, 'x-ratelimit-remaining-tokens-hour'
+        ),
+        remaining_tokens_day=_parse_int_header(
+            headers, 'x-ratelimit-remaining-tokens-day'
+        ),
+        # Retry-After
+        retry_after=_parse_int_header(headers, 'retry-after'),
+    )
+
+
+def extract_headers_from_response(response: Any) -> Dict[str, str]:
+    """Extract headers from a successful LLM response."""
+    headers = {}
+    
+    # LiteLLM: _response_headers
+    if hasattr(response, '_response_headers') and response._response_headers:
+        headers.update(_normalize_headers(response._response_headers))
+    
+    # LiteLLM: _hidden_params.additional_headers
+    if hasattr(response, '_hidden_params') and response._hidden_params:
+        additional = response._hidden_params.get('additional_headers', {})
+        headers.update(_normalize_headers(additional))
+    
+    return headers
+
+
+def extract_headers_from_error(error: Exception) -> Dict[str, str]:
+    """Extract headers from an error response."""
+    headers = {}
+    
+    # Check error.response.headers
+    response = getattr(error, "response", None)
+    if response is not None:
+        if hasattr(response, "headers"):
+            headers.update(_normalize_headers(response.headers))
+        elif isinstance(response, dict) and "headers" in response:
+            headers.update(_normalize_headers(response.get("headers")))
+    
+    # Check error.headers directly
+    if hasattr(error, "headers"):
+        headers.update(_normalize_headers(error.headers))
+    
+    return headers
+
+
+def extract_status_code(error: Exception) -> Optional[int]:
+    """Extract HTTP status code from an error."""
+    # Direct attributes
+    for attr in ("status_code", "status", "http_status", "statusCode"):
+        code = getattr(error, attr, None)
+        if code is not None:
+            try:
+                return int(code)
+            except (ValueError, TypeError):
+                pass
+    
+    # From response object
+    response = getattr(error, "response", None)
+    if response is not None:
+        for attr in ("status_code", "status", "http_status", "statusCode"):
+            code = getattr(response, attr, None)
+            if code is not None:
+                try:
+                    return int(code)
+                except (ValueError, TypeError):
+                    pass
+        if isinstance(response, dict):
+            for key in ("status_code", "status", "http_status", "statusCode"):
+                code = response.get(key)
+                if code is not None:
+                    try:
+                        return int(code)
+                    except (ValueError, TypeError):
+                        pass
+    
+    # Parse from error message
+    match = re.search(r"\b([4-5]\d{2})\b", str(error))
+    if match:
+        return int(match.group(1))
+    
+    return None
+
+
+def is_retryable_error(error: Exception, status_code: Optional[int]) -> bool:
+    """Determine if an error is retryable."""
+    # Rate limit errors are retryable
+    if status_code == 429:
+        return True
+    
+    # Server errors are often retryable
+    if status_code and 500 <= status_code < 600:
+        return True
+    
+    # Check error type name
+    error_type = type(error).__name__
+    if "RateLimit" in error_type or "Timeout" in error_type:
+        return True
+    
+    # Check error message
+    error_msg = str(error).lower()
+    if any(x in error_msg for x in ["rate limit", "too many requests", "timeout", "temporarily"]):
+        return True
+    
+    return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
