@@ -35,18 +35,7 @@ metrics = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
 ]
-orchestration = ["flatmachines>=0.10.0"]
-# Local development (no cloud dependencies)
-local = [
-    "litellm",
-    "aisuite[all]",
-    "jsonschema>=4.0",
-    "opentelemetry-api>=1.20.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-exporter-otlp>=1.20.0",
-    "flatmachines>=0.10.0",
-]
-# Alias for local
+# All local dependencies (no cloud)
 all = [
     "litellm",
     "aisuite[all]",
@@ -54,18 +43,6 @@ all = [
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
-    "flatmachines>=0.10.0",
-]
-# GCP deployment (local + Firestore)
-gcp = [
-    "litellm",
-    "aisuite[all]",
-    "jsonschema>=4.0",
-    "opentelemetry-api>=1.20.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-exporter-otlp>=1.20.0",
-    "google-cloud-firestore>=2.11.0",
-    "flatmachines>=0.10.0",
 ]
 
 [project.urls]

@@ -1,11 +1,11 @@
 """
-Firestore backend for FlatAgents persistence and results.
+Firestore backend for FlatMachines persistence and results.
 
 Implements both PersistenceBackend and ResultBackend using Firestore.
 Compatible with Cloud Functions, Firebase, and local emulator.
 
 Document structure:
-    Collection: flatagents (configurable)
+    Collection: flatmachines (configurable)
     Document ID: {execution_id}
     Subcollections:
         - checkpoints/{step}_{event}
@@ -34,7 +34,7 @@ def _get_firestore():
         except ImportError:
             raise ImportError(
                 "google-cloud-firestore is required for GCP backends. "
-                "Install with: pip install google-cloud-firestore"
+                "Install with: pip install flatmachines[gcp]"
             )
     return _firestore
 
@@ -56,18 +56,18 @@ class FirestoreBackend:
     Uses a single collection with subcollections for organization.
     
     Args:
-        collection: Root collection name (default: "flatagents")
+        collection: Root collection name (default: "flatmachines")
         project: GCP project ID (optional, uses default)
     
     Document Layout:
-        flatagents/{execution_id}/checkpoints/{step_event} = checkpoint data
-        flatagents/{execution_id}/results/{path} = result data
-        flatagents/{execution_id}/_meta = metadata (created_at, etc.)
+        flatmachines/{execution_id}/checkpoints/{step_event} = checkpoint data
+        flatmachines/{execution_id}/results/{path} = result data
+        flatmachines/{execution_id}/_meta = metadata (created_at, etc.)
     """
     
     def __init__(
         self,
-        collection: str = "flatagents",
+        collection: str = "flatmachines",
         project: Optional[str] = None
     ):
         self.collection = collection
@@ -218,7 +218,7 @@ class FirestoreBackend:
         
         return doc.exists
     
-    async def delete(self, uri: str) -> None:
+    async def delete_result(self, uri: str) -> None:
         """Delete result at URI."""
         from ..backends import parse_uri
         

@@ -1,21 +1,12 @@
-# FlatAgents + FlatMachines Reference
+# FlatAgents Reference
 
-> **Target: <1000 tokens.** LLM-optimized. See `flatagent.d.ts`, `flatmachine.d.ts`, `profiles.d.ts` for schemas.
+> **Target: <500 tokens.** LLM-optimized. See `flatagent.d.ts`, `profiles.d.ts` for schemas.
 >
 > **Versioning:** All specs and SDKs use lockstep versioning.
 
-## Concepts
+## Concept
 
 **FlatAgent**: Single LLM call. Model + prompts + output schema. No orchestration.
-**FlatMachine**: State machine orchestrating agents. States, transitions, conditions, loops, error handling.
-
-| Need | Use |
-|------|-----|
-| Single LLM call | FlatAgent |
-| Multi-step/branching/retry/errors | FlatMachine |
-| Parallel execution | `machine: [a, b, c]` |
-| Dynamic parallelism | `foreach` |
-| Background tasks | `launch` |
 
 ## Model Profiles
 
@@ -32,110 +23,93 @@ data:
 ```
 
 Agent model field: `"fast"` | `{ profile: "fast", temperature: 0.9 }` | `{ provider: x, name: y }`
-Resolution: default → profile → overrides → override
 
-## Agent References
+Resolution order: default → profile → overrides → override
 
-`data.agents` values may be:
-- String path to a flatagent config
-- Inline flatagent config (`spec: flatagent`)
-- Typed adapter ref: `{ type: "flatagent" | "smolagents" | "pi-agent", ref?: "...", config?: {...} }`
-
-## State Fields
-
-| Field | Purpose |
-|-------|---------|
-| `type` | `initial` (entry) / `final` (exit+output) |
-| `agent` | Agent to call |
-| `machine` | Machine(s) — string or `[array]` for parallel |
-| `foreach` | Array expr for dynamic parallelism (`as`: item var, `key`: result key) |
-| `launch` / `launch_input` | Fire-and-forget machine(s) |
-| `input` | Map input to agent/machine |
-| `output_to_context` | Map `output.*` to `context.*` |
-| `execution` | `{ type: retry, backoffs: [2,8,16], jitter: 0.1 }` |
-| `on_error` | State name or `{ default: x, ErrorType: y }` |
-| `transitions` | `[{ condition: "expr", to: state }, { to: default }]` |
-| `mode` | `settled` (all) / `any` (first) for parallel |
-| `timeout` | Seconds (0=forever) |
-
-## Patterns
-
-**Execution types**: `default` | `retry` (backoffs, jitter) | `parallel` (n_samples) | `mdap_voting` (k_margin, max_candidates)
-
-**Transitions**: `condition: "context.score >= 8"` with `to: state`. Last without condition = default.
-
-**Loops**: Transition `to: same_state`. Machine has `max_steps` safety.
-
-**Errors**: `on_error: state` or per-type. Context gets `last_error`, `last_error_type`.
-
-**Parallel machines**:
-```yaml
-machine: [review_a, review_b]  # Results keyed by name
-mode: settled  # or "any"
-```
-
-**Foreach**:
-```yaml
-foreach: "{{ context.items }}"
-as: item
-machine: processor
-```
-
-**Launch** (fire-and-forget):
-```yaml
-launch: background_task
-launch_input: { data: "{{ context.data }}" }
-```
-
-## Distributed Worker Pattern
-
-Use hook actions (e.g., `DistributedWorkerHooks`) with a `RegistrationBackend` + `WorkBackend` to build worker pools.
-
-**Core machines**
-- **Checker**: `get_pool_state` → `calculate_spawn` → `spawn_workers`
-- **Worker**: `register_worker` → `claim_job` → process → `complete_job`/`fail_job` → `deregister_worker`
-- **Reaper**: `list_stale_workers` → `reap_stale_workers`
-
-`spawn_workers` expects `worker_config_path` in context (or override hooks to resolve it). Custom queues can compose the base hooks and add actions.
+## Agent Config
 
 ```yaml
-context:
-  worker_config_path: "./job_worker.yml"
-states:
-  check_state: { action: get_pool_state }
-  calculate_spawn: { action: calculate_spawn }
-  spawn_workers: { action: spawn_workers }
+spec: flatagent
+spec_version: "1.0.0"
+data:
+  name: my-agent
+  model: "fast"              # Profile name or inline config
+  system: |                  # System prompt
+    You are a helpful assistant.
+  user: |                    # User prompt (Jinja2 template)
+    {{ input.query }}
+  output:                    # Structured output schema
+    answer: { type: str }
+    confidence: { type: float }
 ```
 
-See `sdk/examples/distributed_worker/` for a full example.
+## Output Types
 
-## Context Variables
+| Type | Description |
+|------|-------------|
+| `str` | String, optional `enum: [...]` |
+| `int` | Integer |
+| `float` | Floating point |
+| `bool` | Boolean |
+| `json` | Raw JSON |
+| `list` | Array with `items: { type: ... }` |
+| `object` | Object with `properties: { ... }` |
 
-`context.*` (all states), `input.*` (initial), `output.*` (in output_to_context), `item`/`as` (foreach)
-
-## Hooks
-
-`on_machine_start`, `on_machine_end`, `on_state_enter`, `on_state_exit`, `on_transition`, `on_error`, `on_action`
+## Python Usage
 
 ```python
-class MyHooks(MachineHooks):
-    def on_action(self, action: str, context: dict) -> dict:
-        if action == "fetch": context["data"] = api_call()
-        return context
+from flatagents import FlatAgent
+
+agent = FlatAgent(config_file="agent.yml")
+result = await agent.call(query="Hello")
+print(result.output)  # Structured output dict
 ```
 
-## Persistence
+## LLM Backends
 
-```yaml
-persistence: { enabled: true, backend: local }  # local | memory
+```python
+from flatagents import LiteLLMBackend, AISuiteBackend
+
+# LiteLLM (default)
+agent = FlatAgent(config_file="agent.yml")
+
+# AISuite
+backend = AISuiteBackend(model="openai:gpt-4o")
+agent = FlatAgent(config_file="agent.yml", backend=backend)
 ```
-Resume: `machine.execute(resume_from=execution_id)`
 
-## SDKs
+## Validation
 
-### Python SDKs
-- **flatagents** (agents): `pip install flatagents[litellm]`
-- **flatmachines** (orchestration): `pip install flatmachines[flatagents]`
+```python
+from flatagents import validate_flatagent_config
 
-### JavaScript SDK
-A single JS SDK lives under [`sdk/js`](./sdk/js). It follows the same specs but is not yet split into separate FlatAgents/FlatMachines packages.
+warnings = validate_flatagent_config(config)
+```
+
+## Template Variables
+
+In user/system prompts:
+- `{{ input.* }}` — Runtime input values
+- `{{ context.* }}` — Context dict (when used with orchestration)
+
+## Extractors
+
+| Extractor | Use Case |
+|-----------|----------|
+| `StructuredExtractor` | JSON schema output (default) |
+| `FreeExtractor` | Unstructured text |
+| `FreeThinkingExtractor` | Chain-of-thought + answer |
+| `ToolsExtractor` | Tool/function calling |
+| `RegexExtractor` | Pattern matching |
+
+---
+
+## Orchestration
+
+For multi-agent workflows, state machines, retry logic, and distributed patterns, see the **flatmachines** package:
+
+```bash
+pip install flatmachines[flatagents]
+```
+
+Refer to `flatmachines/MACHINES.md` for orchestration reference.

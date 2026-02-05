@@ -1,13 +1,13 @@
 """
-Google Cloud Platform backends for FlatAgents.
+Google Cloud Platform backends for FlatMachines.
 
 Provides Firestore-based persistence and result storage for
 Cloud Functions and Firebase deployments.
 
 Usage:
-    from flatagents.gcp import FirestoreBackend
+    from flatmachines.gcp import FirestoreBackend
     
-    backend = FirestoreBackend(collection="flatagents")
+    backend = FirestoreBackend(collection="flatmachines")
     machine = FlatMachine(
         config_file="machine.yml",
         persistence=backend,
@@ -15,7 +15,7 @@ Usage:
     )
 
 Requirements:
-    pip install google-cloud-firestore
+    pip install flatmachines[gcp]
 """
 
 from .firestore import FirestoreBackend
