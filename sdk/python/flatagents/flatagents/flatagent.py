@@ -707,6 +707,17 @@ class FlatAgent:
             if self.stream_options is not None:
                 params["stream_options"] = self.stream_options
 
+        # Pass through provider-specific params from model config
+        # LiteLLM and AISuite both forward unknown kwargs to the provider
+        _KNOWN_MODEL_FIELDS = {
+            'name', 'provider', 'temperature', 'max_tokens', 'top_p', 'top_k',
+            'frequency_penalty', 'presence_penalty', 'seed', 'base_url', 'stream',
+            'stream_options', 'profile', 'backend'
+        }
+        for key, value in self._model_config_raw.items():
+            if key not in _KNOWN_MODEL_FIELDS and key not in params and value is not None:
+                params[key] = value
+
         # Add tools if available
         if tools:
             params["tools"] = self._convert_tools_for_llm(tools)
@@ -724,12 +735,67 @@ class FlatAgent:
             extra_attributes={"model": self.model, "backend": self._backend}
         ) as monitor:
             response = await self._call_llm(params)
+            
+            # Extract token usage
             if hasattr(response, 'usage') and response.usage:
                 input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
                 output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
                 estimated_cost = (input_tokens * 0.001 + output_tokens * 0.002) / 1000
                 monitor.metrics["tokens"] = input_tokens + output_tokens
+                monitor.metrics["input_tokens"] = input_tokens
+                monitor.metrics["output_tokens"] = output_tokens
                 monitor.metrics["cost"] = estimated_cost
+            
+            # Extract rate limit headers from LiteLLM response
+            # LiteLLM stores these in _hidden_params or _response_headers
+            response_headers = {}
+            if hasattr(response, '_response_headers') and response._response_headers:
+                response_headers = response._response_headers
+            elif hasattr(response, '_hidden_params') and response._hidden_params:
+                response_headers = response._hidden_params.get('additional_headers', {})
+            
+            # Parse rate limit headers (providers use various naming conventions)
+            def _parse_int_header(headers, *keys):
+                for key in keys:
+                    val = headers.get(key) or headers.get(key.lower())
+                    if val is not None:
+                        try:
+                            return int(val)
+                        except (ValueError, TypeError):
+                            pass
+                return None
+            
+            remaining_requests = _parse_int_header(
+                response_headers,
+                'x-ratelimit-remaining-requests',
+                'x-rate-limit-remaining-requests',
+                'ratelimit-remaining'
+            )
+            remaining_tokens = _parse_int_header(
+                response_headers,
+                'x-ratelimit-remaining-tokens',
+                'x-rate-limit-remaining-tokens'
+            )
+            limit_requests = _parse_int_header(
+                response_headers,
+                'x-ratelimit-limit-requests',
+                'x-rate-limit-limit-requests',
+                'ratelimit-limit'
+            )
+            limit_tokens = _parse_int_header(
+                response_headers,
+                'x-ratelimit-limit-tokens',
+                'x-rate-limit-limit-tokens'
+            )
+            
+            if remaining_requests is not None:
+                monitor.metrics["ratelimit_remaining_requests"] = remaining_requests
+            if remaining_tokens is not None:
+                monitor.metrics["ratelimit_remaining_tokens"] = remaining_tokens
+            if limit_requests is not None:
+                monitor.metrics["ratelimit_limit_requests"] = limit_requests
+            if limit_tokens is not None:
+                monitor.metrics["ratelimit_limit_tokens"] = limit_tokens
 
         # Track usage
         self.total_api_calls += 1

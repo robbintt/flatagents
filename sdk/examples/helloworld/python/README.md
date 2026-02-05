@@ -6,6 +6,8 @@ The demo involves a machine that attempts to build the string "Hello, World!" by
 - Using a `FlatMachine` from YAML configuration.
 - Tracking execution statistics like cost and API calls.
 
+The demo requires a free cerebras key and should rate limit after 10 calls, for up to 60 seconds.
+
 ## Prerequisites
 
 1.  **Python & `uv`**: Ensure you have Python 3.10+ and the `uv` package manager installed.

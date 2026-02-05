@@ -12,32 +12,17 @@ data:
       name: zai-glm-4.7
       temperature: 1.0
       max_tokens: 2048
-
-    # Smart and expensive - good for production/complex tasks
-    smart-expensive:
-      provider: anthropic
-      name: claude-3-opus-20240229
-      temperature: 0.3
-      max_tokens: 4096
-
-    # Local development with Ollama
-    local-dev:
-      provider: ollama
-      name: llama3
-      base_url: http://localhost:11434
-      temperature: 0.7
-      max_tokens: 4096
-
-    # Deterministic output for testing
-    deterministic:
-      provider: openai
-      name: gpt-4-turbo
-      temperature: 0
-      seed: 42
-      max_tokens: 2048
+      
+    extra-params-demo:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 1.0
+      max_tokens: 10
+      # provider specific extra params can be included (cerebras glm 4.7 param)
+      disable_reasoning: true
 
   # Default profile used when agent has no model config
-  default: fast-cheap
+  default: 
 
   # Override profile - uncomment to force all agents to use this
   # override: smart-expensive

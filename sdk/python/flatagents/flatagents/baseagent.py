@@ -18,6 +18,8 @@ logger = get_logger(__name__)
 
 try:
     import litellm
+    # Enable response headers to capture rate limit info
+    litellm.return_response_headers = True
 except ImportError:
     litellm = None
 

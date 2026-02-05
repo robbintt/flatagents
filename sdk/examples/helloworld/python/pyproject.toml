@@ -2,7 +2,7 @@
 name = "flatagent_helloworld"
 version = "0.1.0"
 description = "'Hello, World!' demo for FlatMachine."
-dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
+dependencies = ["flatmachines[flatagents,metrics]", "flatagents[litellm,metrics]"]
 requires-python = ">=3.10"
 
 [build-system]

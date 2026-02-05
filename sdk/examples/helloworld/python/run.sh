@@ -68,15 +68,18 @@ fi
 # 3. Install Dependencies
 echo "📦 Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
-    echo "  - Installing flatmachines from local source..."
-    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATMACHINES_SDK_PATH[flatagents,metrics]"
-    echo "  - Installing flatagents from local source..."
-    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_SDK_PATH[litellm]"
+    # Parse extras from pyproject.toml to install local SDK with correct extras
+    # e.g., "flatagents[aisuite]" → install local flatagents with [aisuite]
+    FLATAGENTS_EXTRAS=$(grep -oE 'flatagents\[[^]]+\]' pyproject.toml | head -1 | grep -oE '\[[^]]+\]' || echo "")
+    FLATMACHINES_EXTRAS=$(grep -oE 'flatmachines\[[^]]+\]' pyproject.toml | head -1 | grep -oE '\[[^]]+\]' || echo "")
+    
+    echo "  - Installing flatmachines from local source${FLATMACHINES_EXTRAS}..."
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATMACHINES_SDK_PATH$FLATMACHINES_EXTRAS"
+    echo "  - Installing flatagents from local source${FLATAGENTS_EXTRAS}..."
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_SDK_PATH$FLATAGENTS_EXTRAS"
 else
-    echo "  - Installing flatmachines from PyPI..."
-    uv pip install --python "$VENV_PATH/bin/python" "flatmachines[flatagents,metrics]"
-    echo "  - Installing flatagents from PyPI..."
-    uv pip install --python "$VENV_PATH/bin/python" "flatagents[litellm]"
+    # PyPI mode: just install the example, its pyproject.toml deps pull everything
+    echo "  - Installing from PyPI (deps from pyproject.toml)..."
 fi
 
 echo "  - Installing helloworld demo package..."

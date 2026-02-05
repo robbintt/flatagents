@@ -10,7 +10,7 @@ data:
   # Uses "fast-cheap" profile from profiles.yml
   # Override max_tokens for this specific agent
   model:
-    profile: "fast-cheap"
+    profile: "extra-params-demo"
     max_tokens: 2000 # or turn off thinking, glm 4.7 always overthinks
 
   system: >

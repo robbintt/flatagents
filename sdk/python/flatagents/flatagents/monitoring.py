@@ -401,7 +401,15 @@ class AgentMonitor:
             )
             self._token_counter = self._meter.create_counter(
                 "flatagents.agent.tokens",
-                description="Tokens used by agent"
+                description="Total tokens used by agent"
+            )
+            self._input_token_counter = self._meter.create_counter(
+                "flatagents.agent.input_tokens",
+                description="Input/prompt tokens used by agent"
+            )
+            self._output_token_counter = self._meter.create_counter(
+                "flatagents.agent.output_tokens",
+                description="Output/completion tokens used by agent"
             )
             self._cost_counter = self._meter.create_counter(
                 "flatagents.agent.cost",
@@ -410,6 +418,23 @@ class AgentMonitor:
             self._status_counter = self._meter.create_counter(
                 "flatagents.agent.executions",
                 description="Agent execution count by status"
+            )
+            # Rate limit gauges - use UpDownCounter for values that can decrease
+            self._ratelimit_remaining_requests = self._meter.create_gauge(
+                "flatagents.ratelimit.remaining_requests",
+                description="Remaining requests before rate limit"
+            )
+            self._ratelimit_remaining_tokens = self._meter.create_gauge(
+                "flatagents.ratelimit.remaining_tokens",
+                description="Remaining tokens before rate limit"
+            )
+            self._ratelimit_limit_requests = self._meter.create_gauge(
+                "flatagents.ratelimit.limit_requests",
+                description="Rate limit for requests"
+            )
+            self._ratelimit_limit_tokens = self._meter.create_gauge(
+                "flatagents.ratelimit.limit_tokens",
+                description="Rate limit for tokens"
             )
     
     def __enter__(self):
@@ -433,21 +458,56 @@ class AgentMonitor:
         if exc_type is not None:
             attributes["error_type"] = exc_type.__name__
         
-        # Log completion
-        self.logger.info(
-            f"Agent {self.agent_id} completed in {duration_ms:.2f}ms - {status}"
-        )
+        # Log completion with optional details
+        log_parts = [f"Agent {self.agent_id} completed in {duration_ms:.2f}ms - {status}"]
+        
+        # Add token breakdown if available
+        if "input_tokens" in self.metrics or "output_tokens" in self.metrics:
+            in_tok = self.metrics.get("input_tokens", 0)
+            out_tok = self.metrics.get("output_tokens", 0)
+            log_parts.append(f"tokens: {in_tok}→{out_tok}")
+        
+        # Add rate limit info if available
+        if "ratelimit_remaining_requests" in self.metrics:
+            remaining = self.metrics["ratelimit_remaining_requests"]
+            limit = self.metrics.get("ratelimit_limit_requests", "?")
+            log_parts.append(f"ratelimit: {remaining}/{limit} reqs")
+        
+        self.logger.info(" | ".join(log_parts))
         
         # Emit metrics if enabled
         if self._meter:
             self._duration_histogram.record(duration_ms, attributes)
             self._status_counter.add(1, attributes)
             
+            # Token metrics
             if "tokens" in self.metrics:
                 self._token_counter.add(self.metrics["tokens"], attributes)
+            if "input_tokens" in self.metrics:
+                self._input_token_counter.add(self.metrics["input_tokens"], attributes)
+            if "output_tokens" in self.metrics:
+                self._output_token_counter.add(self.metrics["output_tokens"], attributes)
             
             if "cost" in self.metrics:
                 self._cost_counter.add(self.metrics["cost"], attributes)
+            
+            # Rate limit metrics (gauges - record current value)
+            if "ratelimit_remaining_requests" in self.metrics:
+                self._ratelimit_remaining_requests.set(
+                    self.metrics["ratelimit_remaining_requests"], attributes
+                )
+            if "ratelimit_remaining_tokens" in self.metrics:
+                self._ratelimit_remaining_tokens.set(
+                    self.metrics["ratelimit_remaining_tokens"], attributes
+                )
+            if "ratelimit_limit_requests" in self.metrics:
+                self._ratelimit_limit_requests.set(
+                    self.metrics["ratelimit_limit_requests"], attributes
+                )
+            if "ratelimit_limit_tokens" in self.metrics:
+                self._ratelimit_limit_tokens.set(
+                    self.metrics["ratelimit_limit_tokens"], attributes
+                )
         
         # Don't suppress exceptions
         return False
