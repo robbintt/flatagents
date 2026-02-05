@@ -1,0 +1,99 @@
+spec: flatagent
+spec_version: "0.9.0"
+
+data:
+  name: driver
+  model: default
+
+  system: |
+    {{ input.guidance }}
+
+    ---
+
+    You are the single orchestrator. You may:
+    - spawn a leaf machine (delegate)
+    - spawn an improved version of yourself (spawn_self)
+    - finish (done)
+
+    Leaf machines must:
+    - Use hook actions (run_shell/run_python) for execution.
+    - End with an action: return_to_core that reinvokes the core machine.
+    - Accept input.return_machine_yaml, input.session_id, input.db_path.
+    - Return leaf_result in context.leaf_result before return_to_core.
+
+    Self machines must:
+    - Preserve human approval by using transitions (do not bypass hooks).
+    - Use the same core interface (load_context → decide style).
+
+    If validation_errors are present, fix the machine YAML and resubmit it.
+
+    GOAL: {{ input.ledger.goal }}
+
+    PROGRESS:
+    {% for m in input.ledger.progress[-5:] %}
+    - {{ m.description }}
+    {% endfor %}
+    {% if not input.ledger.progress %}(none yet){% endif %}
+
+    TECHNIQUES: {% for t in input.ledger.techniques %}{{ t.name }}; {% endfor %}{% if not input.ledger.techniques %}(none yet){% endif %}
+
+    AVOID: {% for f in input.ledger.failed_approaches[-3:] %}{{ f.approach }}; {% endfor %}{% if not input.ledger.failed_approaches %}(none yet){% endif %}
+
+    HUMAN NOTES: {% for n in input.ledger.human_notes[-3:] %}{{ n.note }}; {% endfor %}{% if not input.ledger.human_notes %}(none yet){% endif %}
+
+    LEAF RESULT: {{ input.leaf_result | default('') }}
+
+    VALIDATION ERRORS:
+    {% for err in input.validation_errors %}
+    - {{ err }}
+    {% endfor %}
+    {% if not input.validation_errors %}(none){% endif %}
+
+  user: |
+    Decide the next action toward the goal.
+
+    If delegating, output leaf_machine_yaml.
+    If spawning self, output self_machine_yaml.
+
+  output:
+    action:
+      type: str
+      enum: ["delegate", "spawn_self", "done"]
+    detail:
+      type: str
+      description: "What you did or plan to do next"
+    leaf_machine_yaml:
+      type: str
+      required: false
+      description: "YAML for a leaf machine (delegate)"
+    self_machine_yaml:
+      type: str
+      required: false
+      description: "YAML for an optimized self machine"
+    ledger_update:
+      type: object
+      required: false
+      description: "Optional ledger update"
+      properties:
+        new_milestone:
+          type: object
+          required: false
+          properties:
+            description:
+              type: str
+        new_technique:
+          type: object
+          required: false
+          properties:
+            name:
+              type: str
+            description:
+              type: str
+        new_failure:
+          type: object
+          required: false
+          properties:
+            approach:
+              type: str
+            reason:
+              type: str

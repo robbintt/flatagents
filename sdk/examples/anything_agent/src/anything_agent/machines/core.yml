@@ -1,0 +1,113 @@
+spec: flatmachine
+spec_version: "0.9.0"
+
+data:
+  name: core
+
+  context:
+    session_id: "{{ input.session_id }}"
+    db_path: "{{ input.db_path }}"
+    model_token_limit: 200000
+    context_target_pct: 0.20
+    context_minimum: 12000
+    leaf_result: "{{ input.leaf_result | default('') }}"
+    validation_errors: "{{ input.validation_errors | default([]) }}"
+    candidate_machine_yaml: "{{ input.candidate_machine_yaml | default('') }}"
+
+  agents:
+    driver: ./agents/driver.yml
+
+  states:
+    start:
+      type: initial
+      transitions:
+        - to: load_context
+
+    load_context:
+      action: load_context
+      transitions:
+        - to: decide
+
+    decide:
+      agent: driver
+      input:
+        ledger: "{{ context.ledger }}"
+        guidance: "{{ context.guidance }}"
+        leaf_result: "{{ context.leaf_result }}"
+        token_budget: "{{ context.token_budget }}"
+        token_estimate: "{{ context.token_estimate }}"
+        validation_errors: "{{ context.validation_errors }}"
+        candidate_machine_yaml: "{{ context.candidate_machine_yaml }}"
+        self_machine_yaml: "{{ context.self_machine_yaml | default('') }}"
+      output_to_context:
+        next_action: "{{ output.action }}"
+        action_detail: "{{ output.detail }}"
+        leaf_machine_yaml: "{{ output.leaf_machine_yaml | default('') }}"
+        self_machine_yaml: "{{ output.self_machine_yaml | default(context.self_machine_yaml | default('')) }}"
+        ledger_update: "{{ output.ledger_update | default({}) }}"
+        validation_kind: "{{ 'leaf' if output.action == 'delegate' else 'self' if output.action == 'spawn_self' else '' }}"
+      transitions:
+        - to: validate_decision
+
+    validate_decision:
+      action: validate_decision
+      transitions:
+        - condition: "context.decision_valid != true"
+          to: decide
+        - condition: "context.next_action == 'done'"
+          to: save_and_done
+        - condition: "context.next_action == 'delegate'"
+          to: validate_leaf
+        - condition: "context.next_action == 'spawn_self'"
+          to: validate_self
+        - to: decide
+
+    validate_leaf:
+      action: validate_specs
+      transitions:
+        - condition: "context.validation_passed == true"
+          to: save_before_leaf
+        - to: decide
+
+    save_before_leaf:
+      action: save_ledger
+      transitions:
+        - to: spawn_leaf
+
+    spawn_leaf:
+      action: spawn_leaf
+      transitions:
+        - to: done
+
+    validate_self:
+      action: validate_specs
+      transitions:
+        - condition: "context.validation_passed == true"
+          to: save_before_self
+        - to: decide
+
+    save_before_self:
+      action: save_ledger
+      transitions:
+        - to: spawn_self
+
+    spawn_self:
+      action: spawn_self
+      transitions:
+        - to: done
+
+    save_ledger:
+      action: save_ledger
+      transitions:
+        - to: load_context
+
+    save_and_done:
+      action: save_ledger
+      transitions:
+        - to: done
+
+    done:
+      type: final
+      output:
+        status: "completed"
+        goal: "{{ context.ledger.goal }}"
