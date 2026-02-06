@@ -323,6 +323,7 @@ class RetryExecution(ExecutionType):
     ) -> AgentResult:
         """Execute with retries on failure."""
         last_error = None
+        last_error_result: Optional[AgentResult] = None  # For structured errors from adapter
         max_attempts = len(self.backoffs) + 1  # Initial attempt + retries
         total_api_calls = 0
         total_cost = 0.0
@@ -333,8 +334,39 @@ class RetryExecution(ExecutionType):
                 agent_result = coerce_agent_result(result)
                 total_api_calls += _extract_api_calls(agent_result)
                 total_cost += _extract_cost(agent_result)
+                
+                # Check for structured error from adapter (e.g., rate limit)
+                if agent_result.error:
+                    error_info = agent_result.error
+                    is_retryable = error_info.get("retryable", False)
+                    
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{max_attempts} failed: "
+                        f"{error_info.get('type', 'Error')}: {error_info.get('message', 'Unknown error')}"
+                    )
+                    
+                    if is_retryable and attempt < len(self.backoffs):
+                        # Use retry_after from rate_limit if available
+                        delay = self.backoffs[attempt]
+                        if agent_result.rate_limit:
+                            retry_after = agent_result.rate_limit.get("retry_after")
+                            if retry_after:
+                                delay = max(delay, retry_after)
+                        
+                        delay = self._apply_jitter(delay)
+                        logger.info(f"Retrying in {delay:.1f}s...")
+                        await asyncio.sleep(delay)
+                        last_error_result = agent_result
+                        continue
+                    else:
+                        # Non-retryable or out of retries
+                        last_error_result = agent_result
+                        if not is_retryable:
+                            break  # Don't retry non-retryable errors
+                        continue
+                
+                # Success case
                 payload = agent_result.output_payload()
-
                 merged_usage = _merge_usage(agent_result, total_api_calls)
                 merged_cost = total_cost if total_cost else agent_result.cost
 
@@ -346,6 +378,9 @@ class RetryExecution(ExecutionType):
                         usage=merged_usage,
                         cost=merged_cost,
                         metadata=agent_result.metadata,
+                        finish_reason=agent_result.finish_reason,
+                        rate_limit=agent_result.rate_limit,
+                        provider_data=agent_result.provider_data,
                     )
 
                 if self.retry_on_empty:
@@ -358,6 +393,9 @@ class RetryExecution(ExecutionType):
                     usage=merged_usage,
                     cost=merged_cost,
                     metadata=agent_result.metadata,
+                    finish_reason=agent_result.finish_reason,
+                    rate_limit=agent_result.rate_limit,
+                    provider_data=agent_result.provider_data,
                 )
 
             except Exception as e:
@@ -373,22 +411,54 @@ class RetryExecution(ExecutionType):
                     await asyncio.sleep(delay)
 
         # All retries exhausted
-        logger.error(f"All {max_attempts} attempts failed. Last error: {last_error}")
-        error_payload: Dict[str, Any] = {
-            "_error": str(last_error) if last_error else "LLM call failed",
-            "_error_type": type(last_error).__name__ if last_error else "UnknownError",
+        logger.error(f"All {max_attempts} attempts failed.")
+        
+        usage = {"api_calls": total_api_calls} if total_api_calls else None
+        cost = total_cost if total_cost else None
+        
+        # Prefer structured error from adapter over exception
+        if last_error_result and last_error_result.error:
+            return AgentResult(
+                output=last_error_result.output,
+                content=last_error_result.content,
+                raw=last_error_result.raw,
+                usage=_merge_usage(last_error_result, total_api_calls),
+                cost=cost,
+                metadata=last_error_result.metadata,
+                finish_reason="error",
+                error=last_error_result.error,
+                rate_limit=last_error_result.rate_limit,
+                provider_data=last_error_result.provider_data,
+            )
+        
+        # Fall back to exception-based error
+        error_dict: Dict[str, Any] = {
+            "code": "server_error",
+            "type": type(last_error).__name__ if last_error else "UnknownError",
+            "message": str(last_error) if last_error else "LLM call failed",
+            "retryable": False,  # Already exhausted retries
         }
         status_code = _extract_status_code(last_error)
         if status_code is not None:
-            error_payload["_error_status_code"] = status_code
+            error_dict["status_code"] = status_code
+            if status_code == 429:
+                error_dict["code"] = "rate_limit"
+        
+        # Build provider_data with raw headers from exception
+        provider_data = None
         headers = _extract_error_headers(last_error)
         if headers:
-            error_payload["_error_headers"] = headers
+            provider_data = {"raw_headers": headers}
 
-        usage = {"api_calls": total_api_calls} if total_api_calls else None
-        cost = total_cost if total_cost else None
-
-        return AgentResult(output=error_payload, raw=last_error, usage=usage, cost=cost)
+        return AgentResult(
+            output=None,
+            raw=last_error,
+            usage=usage,
+            cost=cost,
+            finish_reason="error",
+            error=error_dict,
+            provider_data=provider_data,
+        )
 
 
 # MDAP Voting Execution Type

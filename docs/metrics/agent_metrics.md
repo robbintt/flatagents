@@ -426,6 +426,81 @@ match response.finish_reason:
 
 ---
 
+## FlatMachines Integration
+
+When used with flatmachines orchestration, metrics flow through the `AgentResult` contract.
+
+### How Metrics Flow
+
+```
+flatagents.AgentResponse
+        │
+        │  FlatAgentAdapter maps fields
+        ▼
+flatmachines.AgentResult
+        │
+        │  Hooks receive structured data
+        ▼
+on_state_exit(state, context, output)
+```
+
+### Handling Errors in Hooks
+
+```python
+def on_state_exit(self, state_name, context, output):
+    # output is AgentResult as dict
+    if output and isinstance(output, dict):
+        error = output.get("error")
+        if error and error.get("code") == "rate_limit":
+            rate_limit = output.get("rate_limit", {})
+            
+            # Check which window is exhausted
+            for window in rate_limit.get("windows", []):
+                if window.get("remaining") == 0:
+                    if "day" in window.get("name", ""):
+                        return self._switch_provider(context)
+            
+            # Default: wait and retry
+            context["retry_delay"] = rate_limit.get("retry_after", 60)
+            return "wait_and_retry"
+    
+    return output
+```
+
+### Rate Limit Windows
+
+FlatMachines normalizes rate limits into windows for flexible orchestration:
+
+```python
+# From AgentResult.rate_limit
+{
+    "limited": True,
+    "retry_after": 60,
+    "windows": [
+        {"name": "requests_per_minute", "resource": "requests", "remaining": 0, ...},
+        {"name": "tokens_per_day", "resource": "tokens", "remaining": 500000, ...},
+    ]
+}
+```
+
+This allows smart decisions like:
+- Switch providers when daily limit hit
+- Short wait for minute limits
+- Long wait for hour limits
+
+### Provider Data Access
+
+Raw headers are available in `provider_data` for custom parsing:
+
+```python
+raw_headers = output.get("provider_data", {}).get("raw_headers", {})
+cerebras_day_tokens = raw_headers.get("x-ratelimit-remaining-tokens-day")
+```
+
+See [AgentResult Contract](../flatmachines/agent-result.md) for full documentation.
+
+---
+
 ## OpenTelemetry Metrics
 
 When OTEL is enabled, flatagents records:

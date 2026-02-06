@@ -51,6 +51,9 @@ from .agents import (
     AgentAdapterRegistry,
     normalize_agent_ref,
     coerce_agent_result,
+    # Rate limit helpers
+    build_rate_limit_windows,
+    build_rate_limit_state,
 )
 from .distributed import (
     WorkerRegistration,
@@ -117,6 +120,8 @@ __all__ = [
     "AgentAdapterRegistry",
     "normalize_agent_ref",
     "coerce_agent_result",
+    "build_rate_limit_windows",
+    "build_rate_limit_state",
     "WorkerRegistration",
     "WorkerRecord",
     "WorkerFilter",
