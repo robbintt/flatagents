@@ -411,6 +411,14 @@ class AgentMonitor:
                 "flatagents.agent.output_tokens",
                 description="Output/completion tokens used by agent"
             )
+            self._cache_read_token_counter = self._meter.create_counter(
+                "flatagents.agent.cache_read_tokens",
+                description="Cache read tokens (prompt caching)"
+            )
+            self._cache_write_token_counter = self._meter.create_counter(
+                "flatagents.agent.cache_write_tokens",
+                description="Cache write tokens (prompt caching)"
+            )
             self._cost_counter = self._meter.create_counter(
                 "flatagents.agent.cost",
                 description="Estimated cost of agent execution"
@@ -419,7 +427,7 @@ class AgentMonitor:
                 "flatagents.agent.executions",
                 description="Agent execution count by status"
             )
-            # Rate limit gauges - use UpDownCounter for values that can decrease
+            # Rate limit gauges
             self._ratelimit_remaining_requests = self._meter.create_gauge(
                 "flatagents.ratelimit.remaining_requests",
                 description="Remaining requests before rate limit"
@@ -487,6 +495,10 @@ class AgentMonitor:
                 self._input_token_counter.add(self.metrics["input_tokens"], attributes)
             if "output_tokens" in self.metrics:
                 self._output_token_counter.add(self.metrics["output_tokens"], attributes)
+            if "cache_read_tokens" in self.metrics:
+                self._cache_read_token_counter.add(self.metrics["cache_read_tokens"], attributes)
+            if "cache_write_tokens" in self.metrics:
+                self._cache_write_token_counter.add(self.metrics["cache_write_tokens"], attributes)
             
             if "cost" in self.metrics:
                 self._cost_counter.add(self.metrics["cost"], attributes)

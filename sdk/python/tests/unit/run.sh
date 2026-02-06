@@ -4,6 +4,22 @@ set -e
 # --- Configuration ---
 VENV_PATH=".venv"
 
+# --- Parse Arguments ---
+# Filter out --local flag (unit tests always use local install)
+PYTEST_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --local|-l)
+            # Already using local install, just skip this arg
+            shift
+            ;;
+        *)
+            PYTEST_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
 # --- Script Logic ---
 echo "--- FlatAgents Unit Tests ---"
 
@@ -39,7 +55,8 @@ uv pip install --python "$VENV_PATH/bin/python" pytest pytest-asyncio
 # 3. Run the Tests
 echo "Running unit tests..."
 echo "---"
-"$VENV_PATH/bin/python" -m pytest test_*.py -v "$@"
+# Run tests in current directory and subdirectories
+"$VENV_PATH/bin/python" -m pytest . -v "${PYTEST_ARGS[@]}"
 echo "---"
 
 echo "Unit tests complete!"

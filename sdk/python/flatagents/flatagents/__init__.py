@@ -20,8 +20,10 @@ from .baseagent import (
     AgentResponse,
     # Response data classes
     UsageInfo,
+    CostInfo,
     RateLimitInfo,
     ErrorInfo,
+    FinishReason,
     # Header extraction utilities
     extract_headers_from_response,
     extract_headers_from_error,
@@ -47,6 +49,15 @@ from .monitoring import (
     AgentMonitor,
     track_operation,
 )
+# Provider-specific utilities
+from .providers import (
+    CerebrasRateLimits,
+    extract_cerebras_rate_limits,
+    AnthropicRateLimits,
+    extract_anthropic_rate_limits,
+    OpenAIRateLimits,
+    extract_openai_rate_limits,
+)
 
 __all__ = [
     "__version__",
@@ -71,14 +82,23 @@ __all__ = [
     "AgentResponse",
     # Response data classes
     "UsageInfo",
+    "CostInfo",
     "RateLimitInfo",
     "ErrorInfo",
+    "FinishReason",
     # Header extraction utilities
     "extract_headers_from_response",
     "extract_headers_from_error",
     "extract_rate_limit_info",
     "extract_status_code",
     "is_retryable_error",
+    # Provider-specific utilities
+    "CerebrasRateLimits",
+    "extract_cerebras_rate_limits",
+    "AnthropicRateLimits",
+    "extract_anthropic_rate_limits",
+    "OpenAIRateLimits",
+    "extract_openai_rate_limits",
     # Validation
     "validate_flatagent_config",
     "get_flatagent_schema",

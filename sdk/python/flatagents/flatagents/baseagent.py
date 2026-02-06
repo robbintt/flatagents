@@ -564,56 +564,93 @@ class ToolCall:
     arguments: Dict[str, Any] = field(default_factory=dict)
 
 
+from enum import Enum
+
+
+class FinishReason(str, Enum):
+    """Why the LLM stopped generating."""
+    STOP = "stop"                     # Normal completion
+    LENGTH = "length"                 # Max tokens reached
+    TOOL_USE = "tool_use"             # Tool call requested
+    ERROR = "error"                   # Error occurred
+    ABORTED = "aborted"               # User/signal aborted
+    CONTENT_FILTER = "content_filter" # Safety filter triggered
+
+
 @dataclass
+class CostInfo:
+    """Per-field cost breakdown from an LLM call."""
+    input: float = 0.0
+    output: float = 0.0
+    cache_read: float = 0.0
+    cache_write: float = 0.0
+    total: float = 0.0
+
+
 @dataclass
 class UsageInfo:
     """Token usage information from an LLM call."""
+    # Core tokens
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
-    estimated_cost: float = 0.0
+    
+    # Cache tokens (Anthropic, OpenAI with prompt caching)
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    
+    # Cost breakdown (None if not calculable)
+    cost: Optional[CostInfo] = None
+    
+    # Legacy field for backwards compatibility
+    @property
+    def estimated_cost(self) -> float:
+        """Total estimated cost (backwards compatible)."""
+        return self.cost.total if self.cost else 0.0
 
 
 @dataclass
 class RateLimitInfo:
-    """Rate limit information extracted from response headers."""
-    # Remaining before limit
+    """
+    Provider-agnostic rate limit information.
+    
+    Core fields are normalized across providers. Provider-specific details
+    (like Cerebras time-bucketed limits) can be extracted from raw_headers
+    using provider utility functions.
+    """
+    # Normalized core (most providers expose these)
     remaining_requests: Optional[int] = None
     remaining_tokens: Optional[int] = None
-    # Limits
     limit_requests: Optional[int] = None
     limit_tokens: Optional[int] = None
-    # Time-based (Cerebras-style)
-    remaining_requests_minute: Optional[int] = None
-    remaining_requests_hour: Optional[int] = None
-    remaining_requests_day: Optional[int] = None
-    remaining_tokens_minute: Optional[int] = None
-    remaining_tokens_hour: Optional[int] = None
-    remaining_tokens_day: Optional[int] = None
-    # Retry info
-    retry_after: Optional[int] = None
+    
+    # Timing for backoff
+    reset_at: Optional[float] = None   # Unix timestamp when limits reset
+    retry_after: Optional[int] = None  # Seconds (from Retry-After header)
+    
+    # Raw headers for provider-specific parsing
+    raw_headers: Dict[str, str] = field(default_factory=dict)
     
     def is_limited(self) -> bool:
         """Check if any rate limit is exhausted (remaining == 0)."""
-        for field in [
-            self.remaining_requests, self.remaining_tokens,
-            self.remaining_requests_minute, self.remaining_requests_hour, self.remaining_requests_day,
-            self.remaining_tokens_minute, self.remaining_tokens_hour, self.remaining_tokens_day,
-        ]:
-            if field == 0:
-                return True
+        if self.remaining_requests == 0 or self.remaining_tokens == 0:
+            return True
         return False
     
-    def get_limit_cause(self) -> Optional[str]:
-        """Get the cause of rate limiting (day > hour > minute > general)."""
-        if self.remaining_requests_day == 0 or self.remaining_tokens_day == 0:
-            return "day"
-        if self.remaining_requests_hour == 0 or self.remaining_tokens_hour == 0:
-            return "hour"
-        if self.remaining_requests_minute == 0 or self.remaining_tokens_minute == 0:
-            return "minute"
-        if self.remaining_requests == 0 or self.remaining_tokens == 0:
-            return "general"
+    def get_retry_delay(self) -> Optional[int]:
+        """
+        Get recommended retry delay in seconds.
+        
+        Uses retry_after if available, otherwise estimates from reset_at.
+        """
+        if self.retry_after is not None:
+            return self.retry_after
+        
+        if self.reset_at is not None:
+            import time
+            delay = int(self.reset_at - time.time())
+            return max(0, delay)
+        
         return None
 
 
@@ -623,8 +660,6 @@ class ErrorInfo:
     error_type: str
     message: str
     status_code: Optional[int] = None
-    headers: Optional[Dict[str, str]] = None
-    rate_limit: Optional[RateLimitInfo] = None
     retryable: bool = False
 
 
@@ -638,10 +673,10 @@ class AgentResponse:
         output: Parsed output according to output schema (if defined)
         tool_calls: List of tool calls requested by LLM (if any)
         raw_response: Raw LLM response object for advanced use cases
-        usage: Token usage information
+        usage: Token usage information (includes cache tokens and costs)
         rate_limit: Rate limit info from response headers
+        finish_reason: Why the LLM stopped generating
         error: Error information if call failed (None on success)
-        success: Whether the call succeeded
     """
     content: Optional[str] = None
     output: Optional[Dict[str, Any]] = None
@@ -649,6 +684,7 @@ class AgentResponse:
     raw_response: Optional[Any] = None
     usage: Optional[UsageInfo] = None
     rate_limit: Optional[RateLimitInfo] = None
+    finish_reason: Optional[FinishReason] = None
     error: Optional[ErrorInfo] = None
     
     @property
@@ -701,43 +737,119 @@ def _parse_int_header(headers: Dict[str, str], *keys) -> Optional[int]:
     return None
 
 
+def _parse_reset_timestamp(headers: Dict[str, str], *keys) -> Optional[float]:
+    """
+    Parse a reset timestamp from headers.
+    
+    Handles multiple formats:
+    - Unix timestamp (seconds or milliseconds)
+    - ISO 8601 datetime string
+    - Relative seconds (e.g., "60s" or just "60")
+    """
+    import time
+    from datetime import datetime
+    
+    for key in keys:
+        val = headers.get(key) or headers.get(key.lower())
+        if val is None:
+            continue
+        
+        val = val.strip()
+        
+        # Try parsing as integer (unix timestamp or seconds)
+        try:
+            num = float(val.rstrip('s'))
+            # If it looks like a unix timestamp (> year 2000 in seconds)
+            if num > 946684800:
+                # If it's in milliseconds, convert to seconds
+                if num > 946684800000:
+                    return num / 1000
+                return num
+            else:
+                # It's relative seconds, convert to absolute
+                return time.time() + num
+        except ValueError:
+            pass
+        
+        # Try parsing as ISO 8601 datetime
+        try:
+            # Handle various ISO formats
+            for fmt in [
+                '%Y-%m-%dT%H:%M:%S.%fZ',
+                '%Y-%m-%dT%H:%M:%SZ',
+                '%Y-%m-%dT%H:%M:%S%z',
+                '%Y-%m-%dT%H:%M:%S',
+            ]:
+                try:
+                    dt = datetime.strptime(val, fmt)
+                    return dt.timestamp()
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+    
+    return None
+
+
 def extract_rate_limit_info(headers: Dict[str, str]) -> RateLimitInfo:
-    """Extract rate limit information from response headers."""
+    """
+    Extract rate limit information from response headers.
+    
+    Supports multiple providers:
+    - OpenAI: x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens, etc.
+    - Anthropic: anthropic-ratelimit-requests-remaining, anthropic-ratelimit-tokens-remaining, etc.
+    - Generic: ratelimit-remaining, ratelimit-limit
+    """
+    # OpenAI-style headers
+    remaining_requests = _parse_int_header(
+        headers,
+        'x-ratelimit-remaining-requests',
+        'ratelimit-remaining',
+        # Anthropic-style
+        'anthropic-ratelimit-requests-remaining',
+    )
+    remaining_tokens = _parse_int_header(
+        headers,
+        'x-ratelimit-remaining-tokens',
+        # Anthropic-style
+        'anthropic-ratelimit-tokens-remaining',
+    )
+    limit_requests = _parse_int_header(
+        headers,
+        'x-ratelimit-limit-requests',
+        'ratelimit-limit',
+        # Anthropic-style
+        'anthropic-ratelimit-requests-limit',
+    )
+    limit_tokens = _parse_int_header(
+        headers,
+        'x-ratelimit-limit-tokens',
+        # Anthropic-style
+        'anthropic-ratelimit-tokens-limit',
+    )
+    
+    # Parse reset timestamp
+    reset_at = _parse_reset_timestamp(
+        headers,
+        'x-ratelimit-reset-requests',
+        'x-ratelimit-reset-tokens',
+        'x-ratelimit-reset',
+        # Anthropic-style
+        'anthropic-ratelimit-requests-reset',
+        'anthropic-ratelimit-tokens-reset',
+    )
+    
+    # Retry-After header
+    retry_after = _parse_int_header(headers, 'retry-after')
+    
     return RateLimitInfo(
-        # General rate limits
-        remaining_requests=_parse_int_header(
-            headers, 'x-ratelimit-remaining-requests', 'ratelimit-remaining'
-        ),
-        remaining_tokens=_parse_int_header(
-            headers, 'x-ratelimit-remaining-tokens'
-        ),
-        limit_requests=_parse_int_header(
-            headers, 'x-ratelimit-limit-requests', 'ratelimit-limit'
-        ),
-        limit_tokens=_parse_int_header(
-            headers, 'x-ratelimit-limit-tokens'
-        ),
-        # Cerebras-style time-based limits
-        remaining_requests_minute=_parse_int_header(
-            headers, 'x-ratelimit-remaining-requests-minute'
-        ),
-        remaining_requests_hour=_parse_int_header(
-            headers, 'x-ratelimit-remaining-requests-hour'
-        ),
-        remaining_requests_day=_parse_int_header(
-            headers, 'x-ratelimit-remaining-requests-day'
-        ),
-        remaining_tokens_minute=_parse_int_header(
-            headers, 'x-ratelimit-remaining-tokens-minute'
-        ),
-        remaining_tokens_hour=_parse_int_header(
-            headers, 'x-ratelimit-remaining-tokens-hour'
-        ),
-        remaining_tokens_day=_parse_int_header(
-            headers, 'x-ratelimit-remaining-tokens-day'
-        ),
-        # Retry-After
-        retry_after=_parse_int_header(headers, 'retry-after'),
+        remaining_requests=remaining_requests,
+        remaining_tokens=remaining_tokens,
+        limit_requests=limit_requests,
+        limit_tokens=limit_tokens,
+        reset_at=reset_at,
+        retry_after=retry_after,
+        raw_headers=headers,
     )
 
 

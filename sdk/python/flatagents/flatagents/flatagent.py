@@ -30,8 +30,10 @@ from .baseagent import (
     AgentResponse,
     ToolCall,
     UsageInfo,
+    CostInfo,
     RateLimitInfo,
     ErrorInfo,
+    FinishReason,
     extract_headers_from_response,
     extract_headers_from_error,
     extract_rate_limit_info,
@@ -735,11 +737,11 @@ class FlatAgent:
         # Call LLM via selected backend with metrics tracking
         input_tokens = 0
         output_tokens = 0
-        estimated_cost = 0.0
         response = None
         error_info = None
         rate_limit_info = None
         usage_info = None
+        finish_reason = None
         
         with AgentMonitor(
             self.agent_name,
@@ -750,40 +752,62 @@ class FlatAgent:
                 
                 # Extract token usage from successful response
                 if hasattr(response, 'usage') and response.usage:
-                    input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
-                    output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
-                    estimated_cost = (input_tokens * 0.001 + output_tokens * 0.002) / 1000
+                    usage = response.usage
+                    input_tokens = getattr(usage, 'prompt_tokens', 0) or 0
+                    output_tokens = getattr(usage, 'completion_tokens', 0) or 0
+                    
+                    # Extract cache tokens (LiteLLM exposes these for Anthropic/OpenAI)
+                    cache_read_tokens, cache_write_tokens = self._extract_cache_tokens(usage)
+                    
+                    # Calculate cost
+                    cost_info = self._calculate_cost(response, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+                    
                     usage_info = UsageInfo(
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         total_tokens=input_tokens + output_tokens,
-                        estimated_cost=estimated_cost
+                        cache_read_tokens=cache_read_tokens,
+                        cache_write_tokens=cache_write_tokens,
+                        cost=cost_info,
                     )
+                    
+                    # Record metrics
                     monitor.metrics["tokens"] = input_tokens + output_tokens
                     monitor.metrics["input_tokens"] = input_tokens
                     monitor.metrics["output_tokens"] = output_tokens
-                    monitor.metrics["cost"] = estimated_cost
+                    if cache_read_tokens:
+                        monitor.metrics["cache_read_tokens"] = cache_read_tokens
+                    if cache_write_tokens:
+                        monitor.metrics["cache_write_tokens"] = cache_write_tokens
+                    if cost_info:
+                        monitor.metrics["cost"] = cost_info.total
+                
+                # Extract finish reason
+                finish_reason = self._extract_finish_reason(response)
+                if finish_reason:
+                    monitor.metrics["finish_reason"] = finish_reason.value
                 
                 # Extract rate limit headers from successful response
                 response_headers = extract_headers_from_response(response)
                 if response_headers:
                     rate_limit_info = extract_rate_limit_info(response_headers)
                     self._record_rate_limit_metrics(monitor, rate_limit_info)
+                else:
+                    # Ensure raw_headers is at least empty dict
+                    rate_limit_info = RateLimitInfo(raw_headers={})
                     
             except Exception as e:
                 # Extract headers and status from error
                 error_headers = extract_headers_from_error(e)
                 status_code = extract_status_code(e)
-                rate_limit_info = extract_rate_limit_info(error_headers) if error_headers else None
+                rate_limit_info = extract_rate_limit_info(error_headers) if error_headers else RateLimitInfo(raw_headers={})
                 retryable = is_retryable_error(e, status_code)
                 
                 error_info = ErrorInfo(
                     error_type=type(e).__name__,
                     message=str(e),
                     status_code=status_code,
-                    headers=error_headers if error_headers else None,
-                    rate_limit=rate_limit_info,
-                    retryable=retryable
+                    retryable=retryable,
                 )
                 
                 # Record error metrics
@@ -795,25 +819,25 @@ class FlatAgent:
                     self._record_rate_limit_metrics(monitor, rate_limit_info)
                     if rate_limit_info.is_limited():
                         monitor.metrics["rate_limited"] = True
-                        monitor.metrics["rate_limit_cause"] = rate_limit_info.get_limit_cause()
                 
                 logger.warning(
                     f"LLM call failed: {error_info.error_type} - {error_info.message[:100]}"
                     + (f" (status={status_code})" if status_code else "")
-                    + (f" [rate_limit={rate_limit_info.get_limit_cause()}]" if rate_limit_info and rate_limit_info.is_limited() else "")
+                    + (" [rate_limited]" if rate_limit_info and rate_limit_info.is_limited() else "")
                 )
                 
                 # Return error response instead of raising
                 return AgentResponse(
                     error=error_info,
                     rate_limit=rate_limit_info,
-                    raw_response=getattr(e, 'response', None)
+                    finish_reason=FinishReason.ERROR,
+                    raw_response=getattr(e, 'response', None),
                 )
 
         # Track usage
         self.total_api_calls += 1
-        if input_tokens or output_tokens:
-            self.total_cost += estimated_cost
+        if usage_info and usage_info.cost:
+            self.total_cost += usage_info.cost.total
 
         # Extract response content
         message = response.choices[0].message
@@ -855,11 +879,120 @@ class FlatAgent:
             tool_calls=tool_calls,
             raw_response=response,
             usage=usage_info,
-            rate_limit=rate_limit_info
+            rate_limit=rate_limit_info,
+            finish_reason=finish_reason,
         )
     
+    def _extract_cache_tokens(self, usage: Any) -> tuple[int, int]:
+        """
+        Extract cache read/write tokens from LLM usage.
+        
+        Supports multiple formats:
+        - Anthropic: cache_read_input_tokens, cache_creation_input_tokens
+        - OpenAI: prompt_tokens_details.cached_tokens
+        
+        Returns:
+            Tuple of (cache_read_tokens, cache_write_tokens)
+        """
+        cache_read = 0
+        cache_write = 0
+        
+        if usage is None:
+            return cache_read, cache_write
+        
+        # Anthropic style (via LiteLLM)
+        cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+        cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+        
+        # OpenAI style (prompt_tokens_details.cached_tokens)
+        if not cache_read:
+            details = getattr(usage, 'prompt_tokens_details', None)
+            if details:
+                cache_read = getattr(details, 'cached_tokens', 0) or 0
+        
+        return cache_read, cache_write
+    
+    def _calculate_cost(
+        self,
+        response: Any,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
+    ) -> Optional[CostInfo]:
+        """
+        Calculate per-field costs using LiteLLM if available.
+        
+        Falls back to rough estimation if LiteLLM cost calculation fails.
+        """
+        # Try LiteLLM's accurate cost calculation first
+        if litellm is not None and self._backend == "litellm":
+            try:
+                total_cost = litellm.completion_cost(completion_response=response)
+                if total_cost and total_cost > 0:
+                    # LiteLLM gives us total; estimate breakdown proportionally
+                    total_tokens = input_tokens + output_tokens
+                    if total_tokens > 0:
+                        input_ratio = input_tokens / total_tokens
+                        return CostInfo(
+                            input=total_cost * input_ratio,
+                            output=total_cost * (1 - input_ratio),
+                            cache_read=0.0,  # LiteLLM doesn't break this out
+                            cache_write=0.0,
+                            total=total_cost,
+                        )
+            except Exception:
+                pass  # Fall through to estimation
+        
+        # Fallback: rough estimation ($0.001/1K input, $0.002/1K output)
+        # This is a very rough average across providers
+        input_cost = input_tokens * 0.000001
+        output_cost = output_tokens * 0.000002
+        # Cache tokens are typically cheaper
+        cache_read_cost = cache_read_tokens * 0.0000001
+        cache_write_cost = cache_write_tokens * 0.00000125
+        
+        return CostInfo(
+            input=input_cost,
+            output=output_cost,
+            cache_read=cache_read_cost,
+            cache_write=cache_write_cost,
+            total=input_cost + output_cost + cache_read_cost + cache_write_cost,
+        )
+    
+    def _extract_finish_reason(self, response: Any) -> Optional[FinishReason]:
+        """
+        Extract and map finish reason from LLM response.
+        
+        Maps provider-specific finish reasons to FinishReason enum.
+        """
+        if not response or not hasattr(response, 'choices') or not response.choices:
+            return None
+        
+        choice = response.choices[0]
+        reason = getattr(choice, 'finish_reason', None)
+        
+        if not reason:
+            return None
+        
+        reason = reason.lower()
+        
+        # Map common finish reasons
+        mapping = {
+            "stop": FinishReason.STOP,
+            "end_turn": FinishReason.STOP,  # Anthropic
+            "length": FinishReason.LENGTH,
+            "max_tokens": FinishReason.LENGTH,
+            "tool_calls": FinishReason.TOOL_USE,
+            "tool_use": FinishReason.TOOL_USE,  # Anthropic
+            "function_call": FinishReason.TOOL_USE,
+            "content_filter": FinishReason.CONTENT_FILTER,
+        }
+        
+        return mapping.get(reason, FinishReason.STOP)
+    
     def _record_rate_limit_metrics(self, monitor: "AgentMonitor", rate_limit: "RateLimitInfo") -> None:
-        """Record rate limit info to metrics."""
+        """Record rate limit info to metrics (normalized fields only)."""
         if rate_limit.remaining_requests is not None:
             monitor.metrics["ratelimit_remaining_requests"] = rate_limit.remaining_requests
         if rate_limit.remaining_tokens is not None:
@@ -868,19 +1001,10 @@ class FlatAgent:
             monitor.metrics["ratelimit_limit_requests"] = rate_limit.limit_requests
         if rate_limit.limit_tokens is not None:
             monitor.metrics["ratelimit_limit_tokens"] = rate_limit.limit_tokens
-        # Time-based limits
-        if rate_limit.remaining_requests_day is not None:
-            monitor.metrics["ratelimit_remaining_requests_day"] = rate_limit.remaining_requests_day
-        if rate_limit.remaining_requests_hour is not None:
-            monitor.metrics["ratelimit_remaining_requests_hour"] = rate_limit.remaining_requests_hour
-        if rate_limit.remaining_requests_minute is not None:
-            monitor.metrics["ratelimit_remaining_requests_minute"] = rate_limit.remaining_requests_minute
-        if rate_limit.remaining_tokens_day is not None:
-            monitor.metrics["ratelimit_remaining_tokens_day"] = rate_limit.remaining_tokens_day
-        if rate_limit.remaining_tokens_hour is not None:
-            monitor.metrics["ratelimit_remaining_tokens_hour"] = rate_limit.remaining_tokens_hour
-        if rate_limit.remaining_tokens_minute is not None:
-            monitor.metrics["ratelimit_remaining_tokens_minute"] = rate_limit.remaining_tokens_minute
+        if rate_limit.reset_at is not None:
+            monitor.metrics["ratelimit_reset_at"] = rate_limit.reset_at
+        if rate_limit.retry_after is not None:
+            monitor.metrics["ratelimit_retry_after"] = rate_limit.retry_after
 
     def call_sync(
         self,
