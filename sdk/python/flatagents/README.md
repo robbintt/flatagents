@@ -1,272 +1,133 @@
-# FlatAgents
+# FlatAgents (Python SDK)
 
-Define LLM agents in YAML. Run them anywhere.
+Define single-call LLM agents in YAML. Use this package when you want **one structured call** per agent, with optional MCP tools and profile-driven model configs. For orchestration, install `flatmachines` separately.
 
-## What is FlatAgents?
+**For LLM/machine readers:** see [MACHINES.md](./MACHINES.md).
 
-FlatAgents is a **lightweight framework for single LLM calls**. Each agent is a YAML config that specifies:
-- Model configuration
-- System and user prompts
-- Structured output schema
-
-For **multi-agent orchestration**, state machines, and workflows, see [flatmachines](https://pypi.org/project/flatmachines/).
-
-## Why?
-
-- **Composition over inheritance** — compose stateless agents with simple config
-- **Compact structure** — easy for LLMs to read and generate
-- **Inspectable** — every agent is readable config
-- **Language-agnostic** — reduce code in any particular runtime
-- **Common TypeScript interface** — single schema for agents
-
-*Inspired by Kubernetes manifests and character card specifications.*
-
-## Versioning
-
-All specs (`flatagent.d.ts`, `profiles.d.ts`) and SDKs use **lockstep versioning**. A single version number applies across the entire repository.
-
-## Quick Start
+## Install
 
 ```bash
-pip install flatagents[all]
+pip install flatagents[litellm]
+# or
+pip install flatagents[aisuite]
 ```
+
+Optional extras:
+- `flatagents[validation]` – JSON schema validation
+- `flatagents[metrics]` – OpenTelemetry metrics
+- `flatagents[orchestration]` – installs `flatmachines` and re-exports its APIs
+
+## Quick Start
 
 ```python
 from flatagents import FlatAgent
 
 agent = FlatAgent(config_file="reviewer.yml")
-result = await agent.call(query="Review this code...")
+result = await agent.call(code="...")
 print(result.output)
 ```
 
-## Example Agent
+## Agent Config (YAML)
 
-**reviewer.yml**
 ```yaml
 spec: flatagent
-spec_version: "1.0.0"
+spec_version: "0.10.0"
 
 data:
   name: code-reviewer
-
-  model: "smart-expensive"  # Reference profile from profiles.yml
-
-  system: |
-    You are a senior code reviewer. Analyze code for bugs,
-    style issues, and potential improvements.
-
-  user: |
-    Review this code:
-    {{ input.code }}
-
+  model: "smart"     # profile name or inline dict
+  system: "You are a careful reviewer."
+  user: "Review this code: {{ input.code }}"
   output:
-    issues:
-      type: list
-      items:
-        type: str
-      description: "List of issues found"
-    rating:
-      type: str
-      enum: ["good", "needs_work", "critical"]
-      description: "Overall code quality"
+    issues: { type: list, items: { type: str } }
+    rating: { type: str, enum: [good, needs_work, critical] }
 ```
 
-**What the fields mean:**
+### Templates
 
-- **spec/spec_version** — Format identifier and version
-- **data.name** — Agent identifier
-- **data.model** — Profile name, inline config, or profile with overrides
-- **data.system** — System prompt (sets behavior)
-- **data.user** — User prompt template (uses Jinja2, `{{ input.* }}` for runtime values)
-- **data.output** — Structured output schema (the runtime extracts these fields)
+`system` and `user` are Jinja2 templates with:
+- `input.*` from `FlatAgent.call(**input)`
+- `model.*` resolved model config (provider/name/etc)
+- `tools` and `tools_prompt` if MCP tools are configured
 
-## Model Profiles
+### Output Schema
 
-Centralize model configurations in `profiles.yml` and reference them by name:
+If `data.output` is provided, FlatAgents requests JSON mode and parses the response. Invalid JSON falls back to `{"_raw": "..."}`.
 
-**profiles.yml**
+## Model Profiles (profiles.yml)
+
 ```yaml
 spec: flatprofiles
-spec_version: "1.0.0"
+spec_version: "0.10.0"
 
 data:
   model_profiles:
-    fast-cheap:
-      provider: cerebras
-      name: zai-glm-4.6
-      temperature: 0.6
-      max_tokens: 2048
-
-    smart-expensive:
-      provider: anthropic
-      name: claude-3-opus-20240229
-      temperature: 0.3
-      max_tokens: 4096
-
-  default: fast-cheap      # Fallback when agent has no model
-  # override: smart-expensive  # Uncomment to force all agents
+    fast: { provider: cerebras, name: zai-glm-4.6, temperature: 0.6 }
+    smart: { provider: anthropic, name: claude-3-opus-20240229 }
+  default: fast
+  # override: smart
 ```
 
-**Agent usage:**
-```yaml
-# String shorthand — profile lookup
-model: "fast-cheap"
+Resolution order: default → named profile → inline overrides → override.
 
-# Profile with overrides
-model:
-  profile: "fast-cheap"
-  temperature: 0.9
+**Python behavior:** `FlatAgent` auto-discovers the nearest `profiles.yml` next to the config file. If a parent machine passes `profiles_dict`, it is used only as a fallback (no merging).
 
-# Inline config (no profile)
-model:
-  provider: openai
-  name: gpt-4
-  temperature: 0.3
-```
+## Backends
 
-Resolution order (low → high): default profile → named profile → inline overrides → override profile
+Built-in backends:
+- **LiteLLMBackend** (default, `litellm`)
+- **AISuiteBackend** (`aisuite`)
 
-## Output Types
+Selection order:
+1. `backend` argument to `FlatAgent(...)`
+2. `data.model.backend`
+3. `FLATAGENTS_BACKEND` env var ("litellm" or "aisuite")
+4. Auto-detect installed backend (prefers litellm)
 
-```yaml
-output:
-  answer:      { type: str }
-  count:       { type: int }
-  score:       { type: float }
-  valid:       { type: bool }
-  raw:         { type: json }
-  items:       { type: list, items: { type: str } }
-  metadata:    { type: object, properties: { key: { type: str } } }
-```
+## MCP Tools
 
-Use `enum: [...]` to constrain string values.
+Configure MCP in `data.mcp` and pass a `MCPToolProvider` implementation. The SDK does not ship a provider; you supply one (e.g., from `aisuite.mcp`). Tool calls are returned in `AgentResponse.tool_calls`.
 
-## Multi-Agent Workflows
-
-For orchestration, install [flatmachines](https://pypi.org/project/flatmachines/):
-
-```bash
-pip install flatmachines[flatagents]
-```
-
-```python
-from flatmachines import FlatMachine
-
-machine = FlatMachine(config_file="workflow.yml")
-result = await machine.execute(input={"query": "..."})
-```
-
-FlatMachine provides: state transitions, conditional branching, loops, retry with backoff, error recovery, and distributed worker patterns—all in YAML.
-
-## Features
-
-- Python SDK (TypeScript SDK in progress)
-- Structured output extraction
-- Multiple LLM backends (LiteLLM, AISuite)
-- Schema validation
-- Metrics and logging
-- Model profile management
-
-## Specs
-
-TypeScript definitions are the source of truth:
-- [`flatagent.d.ts`](../../spec/flatagent.d.ts)
-- [`profiles.d.ts`](../../spec/profiles.d.ts)
-
-## Python SDK
-
-```bash
-pip install flatagents[litellm]
-```
-
-### LLM Backends
-
-```python
-from flatagents import LiteLLMBackend, AISuiteBackend
-
-# LiteLLM (default)
-agent = FlatAgent(config_file="agent.yml")
-
-# AISuite
-backend = AISuiteBackend(model="openai:gpt-4o")
-agent = FlatAgent(config_file="agent.yml", backend=backend)
-```
-
-### Schema Validation
+## Validation
 
 ```python
 from flatagents import validate_flatagent_config
-
 warnings = validate_flatagent_config(config)
 ```
 
-### Logging & Metrics
+## Logging & Metrics
 
 ```python
 from flatagents import setup_logging, get_logger
-
-setup_logging(level="INFO")  # Respects FLATAGENTS_LOG_LEVEL env var
+setup_logging(level="INFO")
 logger = get_logger(__name__)
 ```
 
-**Env vars**: `FLATAGENTS_LOG_LEVEL` (`DEBUG`/`INFO`/`WARNING`/`ERROR`), `FLATAGENTS_LOG_FORMAT` (`standard`/`json`/`simple`)
+Env vars: `FLATAGENTS_LOG_LEVEL`, `FLATAGENTS_LOG_FORMAT`, `FLATAGENTS_LOG_DIR`.
 
-For OpenTelemetry metrics:
-
+Metrics (OpenTelemetry):
 ```bash
 pip install flatagents[metrics]
 export FLATAGENTS_METRICS_ENABLED=true
 ```
 
-Metrics are enabled by default and print to stdout every 5s. Redirect to file or use OTLP for production:
+## Optional Orchestration
 
-```bash
-# Metrics print to stdout by default
-python your_script.py
-
-# Save to file
-python your_script.py >> metrics.log 2>&1
-
-# Disable if needed
-FLATAGENTS_METRICS_ENABLED=false python your_script.py
-
-# Send to OTLP collector for production
-OTEL_METRICS_EXPORTER=otlp \
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-python your_script.py
-```
-
-**Env vars for metrics**:
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `FLATAGENTS_METRICS_ENABLED` | `true` | Enable OpenTelemetry metrics |
-| `OTEL_METRICS_EXPORTER` | `console` | `console` (stdout) or `otlp` (production) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OTLP collector endpoint |
-| `OTEL_METRIC_EXPORT_INTERVAL` | `5000` / `60000` | Export interval in ms (5s for console, 60s for otlp) |
-| `OTEL_SERVICE_NAME` | `flatagents` | Service name in metrics |
-
-## Migration from Pre-1.0
-
-If you were importing machine classes from `flatagents`:
+If `flatmachines` is installed (`flatagents[orchestration]`), the FlatMachine APIs are re-exported from `flatagents` for convenience:
 
 ```python
-# Old (deprecated)
-from flatagents import FlatMachine, MachineHooks
-
-# New
-from flatmachines import FlatMachine, MachineHooks
+from flatagents import FlatMachine
 ```
 
-The `flatmachines` package contains all orchestration functionality:
-- FlatMachine and state machines
-- Hooks (MachineHooks, LoggingHooks, etc.)
-- Execution types (retry, parallel, MDAP)
-- Persistence and checkpointing
-- Distributed worker patterns
-- GCP backends (Firestore)
+## Examples (Repo)
 
-Install with FlatAgent support:
-```bash
-pip install flatmachines[flatagents]
-```
+- [helloworld](../../examples/helloworld/python)
+- [writer_critic](../../examples/writer_critic/python)
+- [human-in-the-loop](../../examples/human-in-the-loop/python)
+- [parallelism](../../examples/parallelism/python)
+
+## Specs
+
+Source of truth:
+- [`flatagent.d.ts`](./flatagents/assets/flatagent.d.ts)
+- [`profiles.d.ts`](./flatagents/assets/profiles.d.ts)
