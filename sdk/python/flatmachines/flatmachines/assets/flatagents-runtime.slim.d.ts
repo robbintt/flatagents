@@ -21,9 +21,54 @@ export interface AgentResult {
     output?: Record<string, any> | null;
     content?: string | null;
     raw?: any;
-    usage?: Record<string, any> | null;
-    cost?: number | null;
+    usage?: UsageInfo | null;
+    cost?: CostInfo | number | null;
     metadata?: Record<string, any> | null;
+    finish_reason?: string | null;
+    error?: AgentError | null;
+    rate_limit?: RateLimitState | null;
+    provider_data?: ProviderData | null;
+}
+export interface UsageInfo {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    cache_read_tokens?: number;
+    cache_write_tokens?: number;
+}
+export interface CostInfo {
+    input?: number;
+    output?: number;
+    cache_read?: number;
+    cache_write?: number;
+    total?: number;
+}
+export interface AgentError {
+    code?: string;
+    type?: string;
+    message: string;
+    status_code?: number;
+    retryable?: boolean;
+}
+export interface RateLimitState {
+    limited: boolean;
+    retry_after?: number;
+    windows?: RateLimitWindow[];
+}
+export interface RateLimitWindow {
+    name: string;
+    resource: string;
+    remaining?: number;
+    limit?: number;
+    resets_in?: number;
+    reset_at?: number;
+}
+export interface ProviderData {
+    provider?: string;
+    model?: string;
+    request_id?: string;
+    raw_headers?: Record<string, string>;
+    [key: string]: any;
 }
 export interface AgentExecutor {
     execute(input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
@@ -169,7 +214,7 @@ export interface BackendConfig {
     work?: "memory" | "sqlite" | "redis";
     sqlite_path?: string;
 }
-export const SPEC_VERSION = "1.0.0";
+export const SPEC_VERSION = "1.1.0";
 export interface SDKRuntimeWrapper {
     spec: "flatagents-runtime";
     spec_version: typeof SPEC_VERSION;

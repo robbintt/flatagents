@@ -181,14 +181,133 @@ export interface ResultBackend {
     delete(uri: string): Promise<void>;
 }
 
+/**
+ * AGENT RESULT:
+ * --------------
+ * Universal result contract for agent execution across all backends.
+ * All fields are optional and use structured data (no classes) for
+ * cross-language and cross-process/network compatibility.
+ */
+export interface AgentResult {
+    // Content
+    output?: Record<string, any> | null;
+    content?: string | null;
+    raw?: any;  // In-process only, not serialized across boundaries
+    
+    // Metrics
+    usage?: UsageInfo | null;
+    cost?: CostInfo | number | null;  // number for backwards compatibility
+    metadata?: Record<string, any> | null;
+    
+    // Completion status
+    /** Known values: "stop", "length", "tool_use", "error", "content_filter", "aborted" */
+    finish_reason?: string | null;
+    
+    // Error info (null/undefined = success)
+    error?: AgentError | null;
+    
+    // Rate limit state (normalized for orchestration)
+    rate_limit?: RateLimitState | null;
+    
+    // Provider-specific data (includes raw_headers when available)
+    provider_data?: ProviderData | null;
+}
+
+export interface UsageInfo {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    cache_read_tokens?: number;
+    cache_write_tokens?: number;
+}
+
+export interface CostInfo {
+    input?: number;
+    output?: number;
+    cache_read?: number;
+    cache_write?: number;
+    total?: number;
+}
+
+export interface AgentError {
+    /** 
+     * Known values: "rate_limit", "timeout", "server_error", "invalid_request",
+     * "auth_error", "content_filter", "context_length", "model_unavailable"
+     * Custom codes allowed for extension.
+     */
+    code?: string;
+    
+    /** Original error type name (e.g., "RateLimitError", "TimeoutError") */
+    type?: string;
+    
+    /** Human-readable error message */
+    message: string;
+    
+    /** HTTP status code if applicable */
+    status_code?: number;
+    
+    /** Whether retry might succeed */
+    retryable?: boolean;
+}
+
+export interface RateLimitState {
+    /** Is any limit exhausted? */
+    limited: boolean;
+    
+    /** Recommended wait time in seconds */
+    retry_after?: number;
+    
+    /** Per-window breakdown for smart orchestration */
+    windows?: RateLimitWindow[];
+}
+
+export interface RateLimitWindow {
+    /** Identifier: "requests_per_minute", "tokens_per_day", etc. */
+    name: string;
+    
+    /** Known values: "requests", "tokens", "input_tokens", "output_tokens" */
+    resource: string;
+    
+    /** Current remaining in this window */
+    remaining?: number;
+    
+    /** Maximum for this window */
+    limit?: number;
+    
+    /** Seconds until this window resets */
+    resets_in?: number;
+    
+    /** Unix timestamp when this window resets */
+    reset_at?: number;
+}
+
+export interface ProviderData {
+    /** Provider name (e.g., "openai", "anthropic", "cerebras") */
+    provider?: string;
+    
+    /** Model identifier */
+    model?: string;
+    
+    /** Provider's request ID for debugging/support */
+    request_id?: string;
+    
+    /** Raw HTTP headers from response (when backend exposes them) */
+    raw_headers?: Record<string, string>;
+    
+    /** Any other provider-specific data */
+    [key: string]: any;
+}
+
+export interface AgentExecutor {
+    execute(input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
+    metadata?: Record<string, any>;
+}
+
 export interface ExecutionType {
     /**
-     * Execute a function with this strategy.
-     *
-     * @param fn - The async function to execute (typically agent.call)
-     * @returns The result(s) according to strategy
+     * Execute an agent with this strategy.
      */
-    execute<T>(fn: () => Promise<T>): Promise<T>;
+    execute(executor: AgentExecutor, input: Record<string, any>, context?: Record<string, any>): Promise<AgentResult>;
 }
 
 export interface ExecutionConfig {
@@ -488,7 +607,7 @@ export interface BackendConfig {
     sqlite_path?: string;
 }
 
-export const SPEC_VERSION = "0.10.0";
+export const SPEC_VERSION = "1.1.0";
 
 /**
  * Wrapper interface for JSON schema generation.
