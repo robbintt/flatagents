@@ -340,10 +340,15 @@ class RetryExecution(ExecutionType):
                     error_info = agent_result.error
                     is_retryable = error_info.get("retryable", False)
                     
-                    logger.warning(
+                    log_msg = (
                         f"Attempt {attempt + 1}/{max_attempts} failed: "
                         f"{error_info.get('type', 'Error')}: {error_info.get('message', 'Unknown error')}"
                     )
+                    if agent_result.rate_limit:
+                        raw_headers = agent_result.rate_limit.get("raw_headers")
+                        if raw_headers is not None:
+                            log_msg += f" | headers={dict(raw_headers)}"
+                    logger.warning(log_msg)
                     
                     if is_retryable and attempt < len(self.backoffs):
                         # Use retry_after from rate_limit if available
@@ -400,9 +405,14 @@ class RetryExecution(ExecutionType):
 
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Attempt {attempt + 1}/{max_attempts} failed: {e}"
-                )
+                log_msg = f"Attempt {attempt + 1}/{max_attempts} failed: {e}"
+                # Extract headers from error response if available
+                response = getattr(e, "response", None)
+                if response is not None:
+                    headers = getattr(response, "headers", None)
+                    if headers is not None:
+                        log_msg += f" | headers={dict(headers)}"
+                logger.warning(log_msg)
 
                 # If we have more retries, wait with jitter
                 if attempt < len(self.backoffs):

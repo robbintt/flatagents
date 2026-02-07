@@ -820,11 +820,14 @@ class FlatAgent:
                     if rate_limit_info.is_limited():
                         monitor.metrics["rate_limited"] = True
                 
-                logger.warning(
+                log_msg = (
                     f"LLM call failed: {error_info.error_type} - {error_info.message[:100]}"
                     + (f" (status={status_code})" if status_code else "")
                     + (" [rate_limited]" if rate_limit_info and rate_limit_info.is_limited() else "")
                 )
+                if error_headers is not None:
+                    log_msg += f" | headers={dict(error_headers)}"
+                logger.warning(log_msg)
                 
                 # Return error response instead of raising
                 return AgentResponse(

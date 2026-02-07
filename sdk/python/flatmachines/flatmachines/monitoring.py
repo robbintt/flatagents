@@ -110,18 +110,25 @@ def setup_logging(
         # Custom format string
         formatter = logging.Formatter(format, datefmt='%Y-%m-%d %H:%M:%S')
     
-    # Get root logger for flatagents
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
+    # Configure the flatmachines namespace logger, not the root logger.
+    # Applications own the root logger; libraries should only configure
+    # their own namespace.
+    lib_logger = logging.getLogger("flatmachines")
+    lib_logger.setLevel(log_level)
     
     # Clear existing handlers if force
     if force:
-        root_logger.handlers.clear()
+        lib_logger.handlers.clear()
     
-    # Always add stdout handler
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(formatter)
-    root_logger.addHandler(stdout_handler)
+    # Only add a handler if this logger has none yet (avoid duplicates)
+    if not lib_logger.handlers:
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setFormatter(formatter)
+        lib_logger.addHandler(stdout_handler)
+    
+    # Prevent propagation to root to avoid duplicate output when the
+    # application also configures root-level handlers.
+    lib_logger.propagate = False
     
     # Add file handler if FLATAGENTS_LOG_DIR is set
     log_dir = os.getenv('FLATAGENTS_LOG_DIR')
@@ -138,10 +145,10 @@ def setup_logging(
         
         file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
         file_handler.setFormatter(formatter)
-        root_logger.addHandler(file_handler)
+        lib_logger.addHandler(file_handler)
         
         # Log where we're writing to
-        root_logger.info(f"Logging to file: {log_file}")
+        lib_logger.info(f"Logging to file: {log_file}")
     
     _logging_configured = True
 

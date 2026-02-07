@@ -468,8 +468,8 @@ class FlatMachine:
         self._agents[agent_name] = executor
         return executor
 
-    # Pattern for simple path references: output.foo, context.bar.baz, input.x
-    _PATH_PATTERN = re.compile(r'^(output|context|input)(\.[a-zA-Z_][a-zA-Z0-9_]*)+$')
+    # Pattern for bare path references: output, output.foo, context.bar.baz
+    _PATH_PATTERN = re.compile(r'^(output|context|input)(\.[a-zA-Z_][a-zA-Z0-9_]*)*$')
 
     def _resolve_path(self, path: str, variables: Dict[str, Any]) -> Any:
         """Resolve a dotted path like 'output.chapters' to its value."""
@@ -483,26 +483,26 @@ class FlatMachine:
         return value
 
     def _render_template(self, template_str: str, variables: Dict[str, Any]) -> Any:
-        """Render a Jinja2 template string or resolve a simple path reference."""
+        """Render a Jinja2 template string or resolve a bare path reference.
+
+        Bare paths (no ``{{ }}``): resolved directly, preserving native type.
+        Jinja templates (``{{ }}``): rendered to a string.  Jinja is for
+        rendering — it always returns strings.
+        """
         if not isinstance(template_str, str):
             return template_str
 
-        # Check if it's a template ({{ for expressions, {% for control flow)
-        if '{{' not in template_str and '{%' not in template_str:
-            # Check if it's a simple path reference like "output.chapters"
-            # This allows direct value passing without Jinja2 string conversion
-            if self._PATH_PATTERN.match(template_str.strip()):
-                return self._resolve_path(template_str.strip(), variables)
+        stripped = template_str.strip()
+
+        # No template syntax — check for bare path reference (preserves type)
+        if '{{' not in stripped and '{%' not in stripped:
+            if self._PATH_PATTERN.match(stripped):
+                return self._resolve_path(stripped, variables)
             return template_str
 
+        # Jinja template — render to string
         template = self._jinja_env.from_string(template_str)
-        result = template.render(**variables)
-
-        # Try to parse as JSON for complex types
-        try:
-            return json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            return result
+        return template.render(**variables)
 
     def _render_dict(self, data: Dict[str, Any], variables: Dict[str, Any]) -> Dict[str, Any]:
         """Recursively render all template strings in a dict."""
@@ -1067,7 +1067,12 @@ class FlatMachine:
     def _accumulate_agent_metrics(self, result: AgentResult) -> None:
         """Accumulate usage/cost from an AgentResult."""
         if result.cost is not None:
-            self.total_cost += result.cost
+            if isinstance(result.cost, (int, float)):
+                self.total_cost += result.cost
+            elif isinstance(result.cost, dict):
+                total = result.cost.get("total")
+                if isinstance(total, (int, float)):
+                    self.total_cost += total
 
         usage = result.usage or {}
         if isinstance(usage, dict):

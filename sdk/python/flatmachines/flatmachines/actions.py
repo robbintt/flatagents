@@ -333,12 +333,10 @@ class SubprocessInvoker(MachineInvoker):
         # Spawn detached process
         cwd = self.working_dir or caller_machine._config_dir
         
-        # Use Popen for fire-and-forget
+        # Use Popen for fire-and-forget — inherit stdout/stderr
         subprocess.Popen(
             cmd,
             cwd=cwd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
             start_new_session=True  # Detach from parent process group
         )
         
@@ -398,8 +396,6 @@ def launch_machine(
         cmd,
         cwd=working_dir,
         env=os.environ.copy(),  # Pass parent environment (includes PYTHONPATH, venv)
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
         start_new_session=True
     )
     
