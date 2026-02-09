@@ -11,3 +11,5 @@ dist
 local
 data
 .checkpoints
+
+logs
