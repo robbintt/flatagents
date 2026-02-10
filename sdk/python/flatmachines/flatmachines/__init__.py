@@ -1,4 +1,4 @@
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 from .flatmachine import FlatMachine
 from .hooks import MachineHooks, LoggingHooks, MetricsHooks, CompositeHooks, WebhookHooks
