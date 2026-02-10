@@ -1045,6 +1045,11 @@ class FlatMachine:
             execution_type = get_execution_type(execution_config)
             result = await execution_type.execute(executor, agent_input, context=context)
             agent_result = coerce_agent_result(result)
+
+            if agent_result.error:
+                err = agent_result.error
+                raise RuntimeError(f"{err.get('type', 'AgentError')}: {err.get('message', 'unknown')}")
+
             output = agent_result.output_payload()
 
             self._accumulate_agent_metrics(agent_result)
