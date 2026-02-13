@@ -71,6 +71,15 @@ from .distributed import (
     create_work_backend,
 )
 from .distributed_hooks import DistributedWorkerHooks
+from .lifecycle import (
+    ExecutionStatus,
+    ExecutionRecord,
+    ExecutionStore,
+    LocalExecutionStore,
+    MemoryExecutionStore,
+    ExecutionManager,
+    supervised_run,
+)
 
 __all__ = [
     "__version__",
@@ -138,4 +147,11 @@ __all__ = [
     "SubprocessInvoker",
     "launch_machine",
     "DistributedWorkerHooks",
+    "ExecutionStatus",
+    "ExecutionRecord",
+    "ExecutionStore",
+    "LocalExecutionStore",
+    "MemoryExecutionStore",
+    "ExecutionManager",
+    "supervised_run",
 ]
