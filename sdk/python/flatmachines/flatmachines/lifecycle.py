@@ -133,7 +133,7 @@ class LocalExecutionStore(ExecutionStore):
     def __init__(self, base_dir: str = ".checkpoints"):
         self._base_dir = Path(base_dir)
         self._base_dir.mkdir(parents=True, exist_ok=True)
-        self._index_path = self._base_dir / "_index.json"
+        self._index_path = self._base_dir / "execution_index.json"
         self._index: Optional[Dict[str, dict]] = None
 
     # -- internal helpers ---------------------------------------------------
