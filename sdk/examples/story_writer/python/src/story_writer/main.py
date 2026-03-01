@@ -15,7 +15,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from flatagents import FlatMachine, LoggingHooks, setup_logging, get_logger
+from flatmachines import FlatMachine, LoggingHooks, setup_logging, get_logger
 
 setup_logging(level='INFO')
 logger = get_logger(__name__)

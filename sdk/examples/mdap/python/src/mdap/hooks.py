@@ -14,7 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import jsonschema
 
-from flatagents import FlatAgent, MachineHooks
+from flatmachines import MachineHooks
+from flatagents import FlatAgent
 
 logger = logging.getLogger(__name__)
 

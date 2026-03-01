@@ -50,10 +50,12 @@ find_project_root() {
 }
 
 PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")"
-PYTHON_SDK_PATH="$PROJECT_ROOT/sdk/python"
+FLATAGENTS_SDK_PATH="$PROJECT_ROOT/sdk/python/flatagents"
+FLATMACHINES_SDK_PATH="$PROJECT_ROOT/sdk/python/flatmachines"
 
 echo "📁 Project root: $PROJECT_ROOT"
-echo "📁 Python SDK: $PYTHON_SDK_PATH"
+echo "📁 FlatAgents SDK: $FLATAGENTS_SDK_PATH"
+echo "📁 FlatMachines SDK: $FLATMACHINES_SDK_PATH"
 
 # Change to the script's directory so `uv` can find pyproject.toml
 cd "$SCRIPT_DIR"
@@ -77,9 +79,13 @@ echo "Virtual environment ready."
 # Install dependencies
 echo "Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
+    echo "  - Installing flatmachines from local source..."
+    uv pip install --python "$VENV_DIR/bin/python" -e "$FLATMACHINES_SDK_PATH[flatagents]" --quiet
     echo "  - Installing flatagents from local source..."
-    uv pip install --python "$VENV_DIR/bin/python" -e "$PYTHON_SDK_PATH[litellm]" --quiet
+    uv pip install --python "$VENV_DIR/bin/python" -e "$FLATAGENTS_SDK_PATH[litellm]" --quiet
 else
+    echo "  - Installing flatmachines from PyPI..."
+    uv pip install --python "$VENV_DIR/bin/python" "flatmachines[flatagents]" --quiet
     echo "  - Installing flatagents from PyPI..."
     uv pip install --python "$VENV_DIR/bin/python" "flatagents[litellm]" --quiet
 fi

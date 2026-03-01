@@ -2,7 +2,7 @@
 name = "support_triage_json"
 version = "0.1.0"
 description = "Support triage with nested FlatMachine (JSON configs)"
-dependencies = ["flatagents[litellm]"]
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
 requires-python = ">=3.10"
 
 [build-system]

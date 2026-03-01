@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 SDK_DIR="$(pwd)"
 REPO_ROOT="$SDK_DIR/../.."
-ASSETS_DIR="$SDK_DIR/flatagents/assets"
+PACKAGES="flatagents flatmachines"
 
 # Parse arguments
 DRY_RUN=true  # Safe by default, note that dry run DOES change local assets.
@@ -35,7 +35,12 @@ if [ "$DRY_RUN" = true ]; then
 fi
 echo ""
 
-# Sync and validate __version__ with pyproject.toml
+# Sync and validate __version__ with pyproject.toml for each package
+for PKG in $PACKAGES; do
+export PKG
+cd "$SDK_DIR/$PKG"
+echo "Checking $PKG version..."
+
 PYPROJECT_VERSION=$(python - <<'PY'
 import pathlib
 import re
@@ -62,31 +67,35 @@ export PYPROJECT_VERSION
 CURRENT_INIT_VERSION=$(python - <<'PY'
 import pathlib
 import re
+import os
 
-text = pathlib.Path("flatagents/__init__.py").read_text()
+pkg = os.environ.get("PKG", "flatagents")
+text = pathlib.Path(f"{pkg}/__init__.py").read_text()
 match = re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.M)
 print(match.group(1) if match else "")
 PY
 )
 
 if [[ -z "$PYPROJECT_VERSION" ]]; then
-    echo "RELEASE ABORTED: Could not read [project] version from pyproject.toml."
+    echo "RELEASE ABORTED: Could not read [project] version from $PKG/pyproject.toml."
     exit 1
 fi
 
 if [[ -z "$CURRENT_INIT_VERSION" ]]; then
-    echo "RELEASE ABORTED: __version__ not found in flatagents/__init__.py."
+    echo "RELEASE ABORTED: __version__ not found in $PKG/$PKG/__init__.py."
     exit 1
 fi
 
 if [[ "$CURRENT_INIT_VERSION" != "$PYPROJECT_VERSION" ]]; then
-    echo "Updating flatagents/__init__.py __version__ to $PYPROJECT_VERSION"
+    echo "Updating $PKG/$PKG/__init__.py __version__ to $PYPROJECT_VERSION"
+    export PKG
     python - <<'PY'
 import os
 import pathlib
 import re
 
-path = pathlib.Path("flatagents/__init__.py")
+pkg = os.environ["PKG"]
+path = pathlib.Path(f"{pkg}/__init__.py")
 text = path.read_text()
 version = os.environ["PYPROJECT_VERSION"]
 updated, count = re.subn(
@@ -96,7 +105,7 @@ updated, count = re.subn(
     flags=re.M,
 )
 if count != 1:
-    raise SystemExit("RELEASE ABORTED: __version__ not found or ambiguous in flatagents/__init__.py")
+    raise SystemExit(f"RELEASE ABORTED: __version__ not found or ambiguous in {pkg}/__init__.py")
 path.write_text(updated)
 PY
 fi
@@ -104,40 +113,27 @@ fi
 UPDATED_INIT_VERSION=$(python - <<'PY'
 import pathlib
 import re
+import os
 
-text = pathlib.Path("flatagents/__init__.py").read_text()
+pkg = os.environ.get("PKG", "flatagents")
+text = pathlib.Path(f"{pkg}/__init__.py").read_text()
 match = re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.M)
 print(match.group(1) if match else "")
 PY
 )
 
 if [[ "$UPDATED_INIT_VERSION" != "$PYPROJECT_VERSION" ]]; then
-    echo "RELEASE ABORTED: __version__ does not match pyproject.toml."
+    echo "RELEASE ABORTED: $PKG __version__ does not match pyproject.toml."
     exit 1
 fi
+done
+cd "$SDK_DIR"
 
-# Copy root TypeScript specs to sdk assets, except the sdk spec, which is not included at this time.
-cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$REPO_ROOT/profiles.d.ts" "$ASSETS_DIR/"
-
-# Copy root README and MACHINES.md for PyPI (hatchling requires readme in package dir)
-cp "$REPO_ROOT/README.md" "$SDK_DIR/README.md"
-cp "$REPO_ROOT/MACHINES.md" "$SDK_DIR/MACHINES.md"
-ln -sf MACHINES.md "$SDK_DIR/AGENTS.md"
-ln -sf MACHINES.md "$SDK_DIR/CLAUDE.md"
-
-# Validate README copy succeeded
-if ! diff -q "$REPO_ROOT/README.md" "$SDK_DIR/README.md" > /dev/null 2>&1; then
-    echo "RELEASE ABORTED: README.md does not match root. Ensure copy step is present."
-    exit 1
-fi
-echo "✓ README.md synced from root"
-
-# Validate MACHINES.md copy succeeded
-if ! diff -q "$REPO_ROOT/MACHINES.md" "$SDK_DIR/MACHINES.md" > /dev/null 2>&1; then
-    echo "RELEASE ABORTED: MACHINES.md does not match root. Ensure copy step is present."
-    exit 1
-fi
-echo "✓ MACHINES.md synced from root (with AGENTS.md, CLAUDE.md symlinks)"
+# Copy root TypeScript specs to sdk assets for each package
+for PKG in $PACKAGES; do
+    ASSETS_DIR="$SDK_DIR/$PKG/$PKG/assets"
+    cp "$REPO_ROOT/flatagent.d.ts" "$REPO_ROOT/flatmachine.d.ts" "$REPO_ROOT/profiles.d.ts" "$ASSETS_DIR/"
+done
 
 # Extract versions from root TypeScript specs
 echo "Extracting spec versions from TypeScript files..."
@@ -201,42 +197,44 @@ fi
 
 echo ""
 
-# Generate spec assets from root specs
-echo "Generating spec assets..."
-"$REPO_ROOT/scripts/generate-spec-assets.sh" "$ASSETS_DIR"
-echo ""
+# Generate spec assets from root specs for each package
+for PKG in $PACKAGES; do
+    ASSETS_DIR="$SDK_DIR/$PKG/$PKG/assets"
+    echo "Generating spec assets for $PKG..."
+    "$REPO_ROOT/scripts/generate-spec-assets.sh" "$ASSETS_DIR"
 
-# Verify generated assets match root specs
-echo "Verifying spec assets..."
-FAILED=0
+    # Verify generated assets match root specs
+    echo "Verifying $PKG spec assets..."
+    FAILED=0
 
-for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts flatagents-runtime.d.ts; do
-    if [ ! -f "$ASSETS_DIR/$file" ]; then
-        echo "  ✗ $file (missing)"
-        FAILED=1
-    elif ! diff -q "$REPO_ROOT/$file" "$ASSETS_DIR/$file" > /dev/null 2>&1; then
-        echo "  ✗ $file (does not match root)"
-        FAILED=1
-    else
-        echo "  ✓ $file"
+    for file in flatagent.d.ts flatmachine.d.ts profiles.d.ts flatagents-runtime.d.ts; do
+        if [ ! -f "$ASSETS_DIR/$file" ]; then
+            echo "  ✗ $file (missing)"
+            FAILED=1
+        elif ! diff -q "$REPO_ROOT/$file" "$ASSETS_DIR/$file" > /dev/null 2>&1; then
+            echo "  ✗ $file (does not match root)"
+            FAILED=1
+        else
+            echo "  ✓ $file"
+        fi
+    done
+
+    for file in flatagent.slim.d.ts flatmachine.slim.d.ts profiles.slim.d.ts flatagents-runtime.slim.d.ts \
+                flatagent.schema.json flatmachine.schema.json profiles.schema.json flatagents-runtime.schema.json; do
+        if [ ! -f "$ASSETS_DIR/$file" ]; then
+            echo "  ✗ $file (missing)"
+            FAILED=1
+        else
+            echo "  ✓ $file"
+        fi
+    done
+
+    if [ "$FAILED" -eq 1 ]; then
+        echo ""
+        echo "RELEASE ABORTED: Spec asset generation failed for $PKG."
+        exit 1
     fi
 done
-
-for file in flatagent.slim.d.ts flatmachine.slim.d.ts profiles.slim.d.ts flatagents-runtime.slim.d.ts \
-            flatagent.schema.json flatmachine.schema.json profiles.schema.json flatagents-runtime.schema.json; do
-    if [ ! -f "$ASSETS_DIR/$file" ]; then
-        echo "  ✗ $file (missing)"
-        FAILED=1
-    else
-        echo "  ✓ $file"
-    fi
-done
-
-if [ "$FAILED" -eq 1 ]; then
-    echo ""
-    echo "RELEASE ABORTED: Spec asset generation failed."
-    exit 1
-fi
 echo "All spec assets verified."
 echo ""
 
@@ -247,18 +245,19 @@ if [ ! -d ~/virtualenvs/twine ]; then
 fi
 source ~/virtualenvs/twine/bin/activate
 
-# Clean previous builds
-rm -rf dist/ build/ *.egg-info
+# Build and upload each package
+for PKG in $PACKAGES; do
+    cd "$SDK_DIR/$PKG"
+    echo "Building $PKG..."
+    rm -rf dist/ build/ *.egg-info
+    python -m build
 
-# Build
-python -m build
-
-# Upload to PyPI (unless dry-run)
-if [ "$DRY_RUN" = true ]; then
+    if [ "$DRY_RUN" = true ]; then
+        echo "DRY RUN: Skipping PyPI upload for $PKG."
+        echo "Built: $(ls dist/*.whl | head -1 | xargs basename)"
+    else
+        twine upload dist/*
+        echo "Released $(ls dist/*.whl | head -1 | xargs basename)"
+    fi
     echo ""
-    echo "DRY RUN: Skipping PyPI upload."
-    echo "Built: $(ls dist/*.whl | head -1 | xargs basename)"
-else
-    twine upload dist/*
-    echo "Released $(ls dist/*.whl | head -1 | xargs basename)"
-fi
+done

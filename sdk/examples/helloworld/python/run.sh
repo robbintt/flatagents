@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Script Logic ---
-echo "--- FlatAgent HelloWorld Demo Runner ---"
+echo "--- FlatMachine HelloWorld Demo Runner ---"
 
 # Get the directory the script is located in
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -40,10 +40,12 @@ find_project_root() {
 }
 
 PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")"
-PYTHON_SDK_PATH="$PROJECT_ROOT/sdk/python"
+FLATAGENTS_SDK_PATH="$PROJECT_ROOT/sdk/python/flatagents"
+FLATMACHINES_SDK_PATH="$PROJECT_ROOT/sdk/python/flatmachines"
 
 echo "📁 Project root: $PROJECT_ROOT"
-echo "📁 Python SDK: $PYTHON_SDK_PATH"
+echo "📁 FlatAgents SDK: $FLATAGENTS_SDK_PATH"
+echo "📁 FlatMachines SDK: $FLATMACHINES_SDK_PATH"
 
 # Change to the script's directory so `uv` can find pyproject.toml
 cd "$SCRIPT_DIR"
@@ -66,11 +68,18 @@ fi
 # 3. Install Dependencies
 echo "📦 Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
-    echo "  - Installing flatagents from local source..."
-    uv pip install --python "$VENV_PATH/bin/python" -e "$PYTHON_SDK_PATH[litellm,metrics]"
+    # Parse extras from pyproject.toml to install local SDK with correct extras
+    # e.g., "flatagents[aisuite]" → install local flatagents with [aisuite]
+    FLATAGENTS_EXTRAS=$(grep -oE 'flatagents\[[^]]+\]' pyproject.toml | head -1 | grep -oE '\[[^]]+\]' || echo "")
+    FLATMACHINES_EXTRAS=$(grep -oE 'flatmachines\[[^]]+\]' pyproject.toml | head -1 | grep -oE '\[[^]]+\]' || echo "")
+    
+    echo "  - Installing flatmachines from local source${FLATMACHINES_EXTRAS}..."
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATMACHINES_SDK_PATH$FLATMACHINES_EXTRAS"
+    echo "  - Installing flatagents from local source${FLATAGENTS_EXTRAS}..."
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_SDK_PATH$FLATAGENTS_EXTRAS"
 else
-    echo "  - Installing flatagents from PyPI..."
-    uv pip install --python "$VENV_PATH/bin/python" "flatagents[litellm,metrics]"
+    # PyPI mode: just install the example, its pyproject.toml deps pull everything
+    echo "  - Installing from PyPI (deps from pyproject.toml)..."
 fi
 
 echo "  - Installing helloworld demo package..."

@@ -8,8 +8,7 @@ import asyncio
 import json
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from flatagents.flatmachine import FlatMachine
-from flatagents.hooks import WebhookHooks, MachineHooks
+from flatmachines import FlatMachine, WebhookHooks, MachineHooks
 
 
 class TestWebhookHooks:
@@ -18,7 +17,7 @@ class TestWebhookHooks:
     @pytest.mark.asyncio
     async def test_webhook_sends_machine_start(self):
         """WebhookHooks sends machine_start event."""
-        with patch('flatagents.hooks.httpx') as mock_httpx:
+        with patch('flatmachines.hooks.httpx') as mock_httpx:
             # Setup mock
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -45,7 +44,7 @@ class TestWebhookHooks:
     @pytest.mark.asyncio
     async def test_webhook_graceful_degradation(self):
         """WebhookHooks returns original value when webhook fails."""
-        with patch('flatagents.hooks.httpx') as mock_httpx:
+        with patch('flatmachines.hooks.httpx') as mock_httpx:
             # Setup mock to raise exception
             mock_client = AsyncMock()
             mock_client.post.side_effect = Exception("Network error")
@@ -77,7 +76,7 @@ class TestWebhookHooks:
     @pytest.mark.asyncio
     async def test_webhook_transition_override(self):
         """WebhookHooks can override transition target."""
-        with patch('flatagents.hooks.httpx') as mock_httpx:
+        with patch('flatmachines.hooks.httpx') as mock_httpx:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"to_state": "override_state"}
@@ -97,7 +96,7 @@ class TestWebhookHooks:
     @pytest.mark.asyncio 
     async def test_webhook_error_recovery(self):
         """WebhookHooks can specify recovery state on error."""
-        with patch('flatagents.hooks.httpx') as mock_httpx:
+        with patch('flatmachines.hooks.httpx') as mock_httpx:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"recovery_state": "error_handler"}

@@ -6,7 +6,7 @@ for human approval or feedback.
 """
 
 from typing import Any, Dict
-from flatagents import MachineHooks
+from flatmachines import MachineHooks
 
 
 class HumanInLoopHooks(MachineHooks):

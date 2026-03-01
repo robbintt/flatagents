@@ -71,11 +71,13 @@ find_project_root() {
 }
 
 PROJECT_ROOT="$(find_project_root "$SCRIPT_DIR")"
-PYTHON_SDK_PATH="$PROJECT_ROOT/sdk/python"
+FLATAGENTS_SDK_PATH="$PROJECT_ROOT/sdk/python/flatagents"
+FLATMACHINES_SDK_PATH="$PROJECT_ROOT/sdk/python/flatmachines"
 PYTHON_DIR="$SCRIPT_DIR/python"
 
 echo "📁 Project root: $PROJECT_ROOT"
-echo "📁 Python SDK: $PYTHON_SDK_PATH"
+echo "📁 FlatAgents SDK: $FLATAGENTS_SDK_PATH"
+echo "📁 FlatMachines SDK: $FLATMACHINES_SDK_PATH"
 
 # Change to the python directory
 cd "$PYTHON_DIR"
@@ -98,9 +100,13 @@ fi
 # 2. Install Dependencies
 echo "📦 Installing dependencies..."
 if [ "$LOCAL_INSTALL" = true ]; then
+    echo "  - Installing flatmachines from local source..."
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATMACHINES_SDK_PATH[flatagents]"
     echo "  - Installing flatagents from local source..."
-    uv pip install --python "$VENV_PATH/bin/python" -e "$PYTHON_SDK_PATH"
+    uv pip install --python "$VENV_PATH/bin/python" -e "$FLATAGENTS_SDK_PATH"
 else
+    echo "  - Installing flatmachines from PyPI..."
+    uv pip install --python "$VENV_PATH/bin/python" "flatmachines[flatagents]"
     echo "  - Installing flatagents from PyPI..."
     uv pip install --python "$VENV_PATH/bin/python" "flatagents"
 fi

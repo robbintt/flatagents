@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Dynamic agent generation with pre-execution supervision"
 requires-python = ">=3.10"
 dependencies = [
-    "flatagents>=0.2.2",
-    "litellm",
+    "flatmachines[flatagents]",
+    "flatagents[litellm]",
     "nest-asyncio",
 ]
 

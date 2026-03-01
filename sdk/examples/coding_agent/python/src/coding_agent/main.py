@@ -19,7 +19,7 @@ import warnings
 warnings.filterwarnings('ignore', message='.*Pydantic serializer warnings.*')
 warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
 
-from flatagents import FlatMachine, setup_logging, get_logger
+from flatmachines import FlatMachine, setup_logging, get_logger
 from .hooks import CodingAgentHooks
 
 # Configure logging (respects LOG_LEVEL env var for quiet mode)

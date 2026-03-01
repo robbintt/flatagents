@@ -8,7 +8,7 @@ Tests:
 """
 
 import pytest
-from flatagents.flatmachine import FlatMachine
+from flatmachines import FlatMachine
 
 
 def get_helloworld_config():
@@ -149,7 +149,7 @@ class TestHelloworldAppendAction:
 
     def test_append_char_action(self):
         """Test that append_char action concatenates correctly."""
-        from flatagents import LoggingHooks
+        from flatmachines import LoggingHooks
 
         class TestHooks(LoggingHooks):
             def on_action(self, action_name, context):
@@ -164,7 +164,7 @@ class TestHelloworldAppendAction:
 
     def test_append_char_from_empty(self):
         """Test appending first character."""
-        from flatagents import LoggingHooks
+        from flatmachines import LoggingHooks
 
         class TestHooks(LoggingHooks):
             def on_action(self, action_name, context):

@@ -22,7 +22,7 @@
 ```yaml
 # profiles.yml — agents reference by name
 spec: flatprofiles
-spec_version: "0.9.0"
+spec_version: "1.1.1"
 data:
   model_profiles:
     fast: { provider: cerebras, name: zai-glm-4.6, temperature: 0.6 }
@@ -33,6 +33,13 @@ data:
 
 Agent model field: `"fast"` | `{ profile: "fast", temperature: 0.9 }` | `{ provider: x, name: y }`
 Resolution: default → profile → overrides → override
+
+## Agent References
+
+`data.agents` values may be:
+- String path to a flatagent config
+- Inline flatagent config (`spec: flatagent`)
+- Typed adapter ref: `{ type: "flatagent" | "smolagents" | "pi-agent", ref?: "...", config?: {...} }`
 
 ## State Fields
 
@@ -123,3 +130,12 @@ class MyHooks(MachineHooks):
 persistence: { enabled: true, backend: local }  # local | memory
 ```
 Resume: `machine.execute(resume_from=execution_id)`
+
+## SDKs
+
+### Python SDKs
+- **flatagents** (agents): `pip install flatagents[litellm]`
+- **flatmachines** (orchestration): `pip install flatmachines[flatagents]`
+
+### JavaScript SDK
+A single JS SDK lives under [`sdk/js`](./sdk/js). It follows the same specs but is not yet split into separate FlatAgents/FlatMachines packages.

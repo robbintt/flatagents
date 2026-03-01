@@ -4,7 +4,7 @@ Unit tests for profiles.yml auto-discovery.
 Tests:
 - discover_profiles_file utility function
 - FlatAgent auto-discovery of profiles.yml
-- FlatMachine auto-discovery of profiles.yml
+- FlatMachine adapter usage of profiles.yml
 - Profile propagation to child agents/machines
 """
 
@@ -175,11 +175,11 @@ data:
 
 
 class TestFlatMachineProfileDiscovery:
-    """Test FlatMachine auto-discovers profiles.yml."""
+    """Test FlatMachine adapter usage of profiles.yml."""
 
     def test_machine_discovers_profiles_in_config_dir(self, tmp_path):
-        """FlatMachine discovers profiles.yml in same directory as config."""
-        from flatagents import FlatMachine
+        """FlatMachine core does not auto-discover profiles.yml."""
+        from flatmachines import FlatMachine
 
         # Create profiles.yml
         profiles_content = """
@@ -214,11 +214,11 @@ data:
 
         machine = FlatMachine(config_file=str(machine_path))
 
-        assert machine._profiles_file == str(tmp_path / "profiles.yml")
+        assert machine._profiles_file is None
 
     def test_machine_propagates_profiles_to_agents(self, tmp_path):
         """FlatMachine passes discovered profiles to child agents in subdirectories."""
-        from flatagents import FlatMachine
+        from flatmachines import FlatMachine
 
         # Create profiles.yml in machine directory
         profiles_content = """
@@ -275,17 +275,16 @@ data:
 
         machine = FlatMachine(config_file=str(machine_path))
 
-        # Get the agent - machine should pass profiles_dict
-        agent = machine._get_agent("child")
+        # Get the executor - adapter should resolve profiles via machine config dir
+        executor = machine._get_executor("child")
+        agent = executor._agent
 
-        # Agent should have received machine's profiles_dict (not profiles_file)
-        assert agent._profiles_dict is not None
         assert agent.model == "anthropic/claude-3-sonnet"
         assert agent.temperature == 0.3
 
     def test_machine_works_without_profiles(self, tmp_path):
         """FlatMachine works when no profiles.yml exists."""
-        from flatagents import FlatMachine
+        from flatmachines import FlatMachine
 
         # Create machine config without profiles.yml
         machine_content = """

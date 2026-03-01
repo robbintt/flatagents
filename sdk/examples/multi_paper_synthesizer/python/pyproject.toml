@@ -2,7 +2,7 @@
 name = "multi_paper_synthesizer"
 version = "0.1.0"
 description = "Multi-paper research synthesizer with machine peering"
-dependencies = ["flatagents[litellm]", "pypdf", "httpx"]
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]", "pypdf", "httpx"]
 requires-python = ">=3.10"
 
 [build-system]

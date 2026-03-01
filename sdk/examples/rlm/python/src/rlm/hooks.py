@@ -8,7 +8,7 @@ This design works across distributed systems (checkpoint/restore, different Lamb
 import logging
 from typing import Any
 
-from flatagents import MachineHooks
+from flatmachines import MachineHooks
 
 try:
     from .repl import REPLExecutor

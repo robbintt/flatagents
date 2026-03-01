@@ -14,7 +14,7 @@ import os
 async def test_distributed_backends_basic():
     """Verify all imports work and basic operations succeed."""
     # Test imports
-    from flatagents import (
+    from flatmachines import (
         WorkerRegistration,
         WorkerRecord,
         WorkerFilter,
@@ -91,7 +91,7 @@ async def test_distributed_backends_basic():
 @pytest.mark.asyncio
 async def test_subprocess_support_imports():
     """Verify subprocess support imports work."""
-    from flatagents import SubprocessInvoker, launch_machine
+    from flatmachines import SubprocessInvoker, launch_machine
     
     # Verify classes/functions exist
     assert SubprocessInvoker is not None
