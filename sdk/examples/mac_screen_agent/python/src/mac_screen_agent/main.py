@@ -157,7 +157,7 @@ def main():
     args = parser.parse_args()
 
     if args.standalone:
-        task = args.standalone if isinstance(args.standalone, str) and args.standalone is not True else args.task
+        task = args.standalone if isinstance(args.standalone, str) else args.task
         if not task:
             parser.error("--standalone requires a task (--standalone 'task' or -p 'task' --standalone)")
         asyncio.run(run_standalone(task))

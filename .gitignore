@@ -5,6 +5,7 @@ __pycache__
 dist
 .DS_Store
 .venv
+.pytest_cache
 
 .claude
 
