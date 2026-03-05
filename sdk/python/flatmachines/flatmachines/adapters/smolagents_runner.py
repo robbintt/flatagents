@@ -76,7 +76,7 @@ def _load_factory(ref: str, cwd: str):
 def main() -> None:
     raw = sys.stdin.read()
     if not raw:
-        raise RuntimeError("No input provided to smolagents runner")
+        raise RuntimeError("Expected JSON input on stdin for smolagents runner")
 
     request: Dict[str, Any] = json.loads(raw)
     ref = request.get("ref")
@@ -85,7 +85,7 @@ def main() -> None:
     cwd = request.get("cwd") or os.getcwd()
 
     if not ref:
-        raise ValueError("Missing 'ref' in smolagents runner request")
+        raise ValueError("Missing required field 'ref' (path to factory module) in smolagents runner request")
 
     # Load factory and build agent
     factory = _load_factory(ref, cwd)
@@ -94,7 +94,7 @@ def main() -> None:
     # Determine task
     task = input_data.get("task") or input_data.get("prompt")
     if task is None:
-        raise ValueError("smolagents runner requires input.task or input.prompt")
+        raise ValueError("Missing required field: smolagents runner requires either input.task or input.prompt")
 
     # Build run kwargs
     run_kwargs: Dict[str, Any] = {}
