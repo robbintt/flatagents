@@ -1,0 +1,20 @@
+[project]
+name = "mac_screen_agent"
+version = "0.1.0"
+description = "macOS screen automation agent — screenshot, mouse, keyboard tools"
+dependencies = ["flatmachines[flatagents]", "flatagents[litellm]"]
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+quartz = ["pyobjc-framework-Quartz", "pyobjc-framework-Cocoa"]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.scripts]
+mac-screen-agent = "mac_screen_agent.main:main"
