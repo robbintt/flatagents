@@ -1,0 +1,30 @@
+# Model Profiles Configuration
+# Centralized model configurations that agents can reference by name
+
+spec: flatprofiles
+spec_version: "1.0.0"
+
+data:
+  model_profiles:
+    # Fast and cheap - good for development/iteration
+    fast-cheap:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 1.0
+      max_tokens: 2048
+
+    extra-params-demo:
+      provider: cerebras
+      name: zai-glm-4.7
+      temperature: 1.0
+      max_tokens: 10
+      disable_reasoning: true
+
+  # Default profile used when agent has no model config
+  default: 
+
+  # Override profile - uncomment to force all agents to use this
+  # override: smart-expensive
+
+metadata:
+  description: "Model profiles for the helloworld_smolagents example"

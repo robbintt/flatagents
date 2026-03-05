@@ -1,0 +1,62 @@
+# Hello World Loop Machine — smolagents variant
+# Builds a target string character by character using a smolagents agent
+# via the subprocess bridge adapter (Python FlatMachine → Python subprocess)
+
+spec: flatmachine
+spec_version: "1.0.0"
+
+data:
+  name: hello-world-smolagents-loop
+
+  context:
+    target: "{{ input.target }}"
+    current: ""
+
+  agents:
+    builder:
+      type: "smolagents-bridge"
+      ref: "../agents/builder.py#build_agent"
+      config:
+        model: cerebras/zai-glm-4.7
+
+  states:
+    start:
+      type: initial
+      transitions:
+        - condition: "context.current == context.target"
+          to: done
+        - to: build_char
+
+    build_char:
+      agent: builder
+      execution:
+        type: retry
+        retry_on_empty: true
+        backoffs: [2, 8, 16, 35]
+        jitter: 0.1
+      input:
+        task: "Target: '{{ context.target }}'\nBuilt so far: '{{ context.current }}'\nNext character:"
+      output_to_context:
+        expected_char: "{{ context.target[context.current|length] }}"
+        last_output: "{{ output.next_char or output.content }}"
+      transitions:
+        - condition: "context.last_output == context.expected_char"
+          to: append_char
+        - to: build_char
+
+    append_char:
+      action: append_char
+      transitions:
+        - condition: "context.current == context.target"
+          to: done
+        - to: build_char
+
+    done:
+      type: final
+      output:
+        result: "{{ context.current }}"
+        success: true
+
+metadata:
+  description: "Builds a target string character by character using smolagents"
+  tags: ["demo", "loop", "smolagents"]
