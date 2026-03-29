@@ -1,0 +1,111 @@
+spec: flatagent
+spec_version: "2.0.0"
+
+data:
+  name: screen-agent
+
+  model: default
+
+  system: |
+    You are a macOS screen automation assistant. You can take screenshots to see what
+    is on the screen, move and click the mouse, and type on the keyboard.
+
+    Guidelines:
+    - ALWAYS start by taking a screenshot to see the current screen state
+    - After each action (click, type, key_press), take another screenshot to verify the result
+    - Use screenshot to observe, then act, then screenshot again to confirm
+    - Coordinates are in pixels from the top-left corner of the screen
+    - When clicking UI elements, aim for the center of buttons/fields
+    - Use key_press for special keys (Return, Tab, Escape, etc.) and shortcuts
+    - Use key_type for typing text into fields
+    - Be precise with coordinates — examine screenshots carefully
+    - If something doesn't work, try a different approach
+
+  user: |
+    {{ input.task }}
+
+  tools:
+    - type: function
+      function:
+        name: screenshot
+        description: >
+          Take a screenshot of the entire screen. Returns the image as a
+          base64-encoded PNG. Use this to see what is currently on the screen
+          before and after performing actions.
+        parameters:
+          type: object
+          properties: {}
+
+    - type: function
+      function:
+        name: mouse_move
+        description: >
+          Move the mouse cursor to the specified screen coordinates.
+        parameters:
+          type: object
+          properties:
+            x:
+              type: number
+              description: "X coordinate (pixels from left edge of screen)"
+            y:
+              type: number
+              description: "Y coordinate (pixels from top edge of screen)"
+          required: [x, y]
+
+    - type: function
+      function:
+        name: mouse_click
+        description: >
+          Click the mouse at the specified screen coordinates. Moves the mouse
+          to (x, y) and performs a click. Supports left, right, and double click.
+        parameters:
+          type: object
+          properties:
+            x:
+              type: number
+              description: "X coordinate (pixels from left edge of screen)"
+            y:
+              type: number
+              description: "Y coordinate (pixels from top edge of screen)"
+            button:
+              type: string
+              description: "Mouse button: 'left' (default), 'right', or 'double'"
+          required: [x, y]
+
+    - type: function
+      function:
+        name: key_type
+        description: >
+          Type a string of text using the keyboard. Each character is typed
+          sequentially. Use this for entering text into fields or documents.
+        parameters:
+          type: object
+          properties:
+            text:
+              type: string
+              description: "Text to type"
+          required: [text]
+
+    - type: function
+      function:
+        name: key_press
+        description: >
+          Press a key or key combination. Use for special keys and shortcuts.
+          Examples: 'Return', 'Tab', 'Escape', 'space', 'delete',
+          'command+c', 'command+v', 'command+a', 'command+shift+3',
+          'control+a', 'option+delete'.
+        parameters:
+          type: object
+          properties:
+            keys:
+              type: string
+              description: >
+                Key or key combination to press. Use '+' for combinations.
+                Special keys: Return, Tab, Escape, space, delete, up, down,
+                left, right, home, end, pageup, pagedown, command, control,
+                option, shift, F1-F12
+          required: [keys]
+
+metadata:
+  description: "macOS screen automation agent with screenshot, mouse, and keyboard tools"
+  tags: ["tool-use", "screen", "macos", "automation"]
