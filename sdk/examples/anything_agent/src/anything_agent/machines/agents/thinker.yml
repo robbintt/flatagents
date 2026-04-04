@@ -1,0 +1,41 @@
+spec: flatagent
+spec_version: "0.9.0"
+
+data:
+  name: thinker
+  model: default
+  
+  system: |
+    {{ input.guidance }}
+    
+    ---
+    
+    GOAL: {{ input.ledger.goal }}
+    
+    PROGRESS:
+    {% for m in input.ledger.progress[-5:] %}
+    - {{ m.description }}
+    {% endfor %}
+    {% if not input.ledger.progress %}(none yet){% endif %}
+    
+    TECHNIQUES: {% for t in input.ledger.techniques %}{{ t.name }}; {% endfor %}{% if not input.ledger.techniques %}(none yet){% endif %}
+    
+    AVOID: {% for f in input.ledger.failed_approaches[-3:] %}{{ f.approach }}; {% endfor %}{% if not input.ledger.failed_approaches %}(none yet){% endif %}
+    
+    HUMAN NOTES: {% for n in input.ledger.human_notes[-3:] %}{{ n.note }}; {% endfor %}{% if not input.ledger.human_notes %}(none yet){% endif %}
+  
+  user: |
+    What's the next step toward the goal? Reply with action (work or done) and detail.
+  
+  output:
+    action:
+      type: str
+      enum: ["work", "done"]
+      description: "work to continue, done if goal achieved"
+    detail:
+      type: str
+      description: "What to do next, or why goal is complete"
+    ledger_update:
+      type: object
+      required: false
+      description: "Optional: new_technique or new_milestone to add"

@@ -1,0 +1,44 @@
+{
+    "name": "custom-mcp-box",
+    "version": "1.0.0",
+    "description": "Custom MCP Box configuration example",
+    "pipeline_config": {
+        "abstract": {
+            "normalize_names": true
+        },
+        "cluster": {
+            "min_cluster_size": 1,
+            "similarity_threshold": 0.5
+        },
+        "consolidate": {
+            "retry_count": 3,
+            "retry_delay": 1.0
+        }
+    },
+    "tools": [
+        {
+            "name": "custom_search",
+            "description": "Custom file search tool",
+            "function": "mcp_box.tools.file_ops.file_search",
+            "category": "search",
+            "parameters": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Search pattern"
+                }
+            }
+        },
+        {
+            "name": "custom_test",
+            "description": "Custom test runner",
+            "function": "mcp_box.tools.testing.run_tests",
+            "category": "testing",
+            "parameters": {
+                "path": {
+                    "type": "string",
+                    "description": "Test path"
+                }
+            }
+        }
+    ]
+}

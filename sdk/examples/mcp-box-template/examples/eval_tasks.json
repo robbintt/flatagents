@@ -1,0 +1,41 @@
+[
+    {
+        "id": "search_py_files",
+        "description": "Search for Python files in current directory",
+        "task": {
+            "action": "file_search",
+            "pattern": "*.py",
+            "max_results": 10
+        },
+        "expected_success": true
+    },
+    {
+        "id": "search_json_files",
+        "description": "Search for JSON files",
+        "task": {
+            "action": "file_search",
+            "pattern": "*.json",
+            "max_results": 10
+        },
+        "expected_success": true
+    },
+    {
+        "id": "search_with_content",
+        "description": "Search files containing 'import'",
+        "task": {
+            "action": "file_search",
+            "pattern": "*.py",
+            "content_pattern": "import",
+            "max_results": 5
+        },
+        "expected_success": true
+    },
+    {
+        "id": "unknown_tool",
+        "description": "Call unknown tool (should fail)",
+        "task": {
+            "action": "nonexistent_tool"
+        },
+        "expected_success": false
+    }
+]

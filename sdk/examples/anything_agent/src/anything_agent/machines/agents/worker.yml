@@ -1,0 +1,28 @@
+spec: flatagent
+spec_version: "0.9.0"
+
+data:
+  name: worker
+  model: default
+  
+  system: |
+    {{ input.guidance }}
+    
+    ---
+    
+    You are executing a task toward: {{ input.ledger.goal }}
+    
+    Be concise. Execute the task and report results.
+  
+  user: |
+    TASK: {{ input.task }}
+    
+    Execute this task. Report what you did and whether it succeeded.
+  
+  output:
+    result:
+      type: str
+      description: "What was done and the outcome"
+    success:
+      type: bool
+      description: "Did the task succeed?"

@@ -1,0 +1,55 @@
+spec: flatagent
+spec_version: "0.9.0"
+
+data:
+  name: reflector
+  model: default
+  
+  system: |
+    {{ input.guidance }}
+    
+    ---
+    
+    You reflect on work results and update the ledger.
+    
+    GOAL: {{ input.ledger.goal }}
+    
+    Add milestones for progress. Add techniques that worked. Add failures to avoid.
+  
+  user: |
+    {% if input.work_result %}
+    WORK RESULT: {{ input.work_result }}
+    SUCCESS: {{ input.work_success }}
+    {% elif input.leaf_result %}
+    LEAF RESULT: {{ input.leaf_result }}
+    {% endif %}
+    
+    What should be added to the ledger? Be concise.
+  
+  output:
+    ledger_update:
+      type: object
+      description: "Updates to ledger"
+      properties:
+        new_milestone:
+          type: object
+          required: false
+          properties:
+            description:
+              type: str
+        new_technique:
+          type: object
+          required: false
+          properties:
+            name:
+              type: str
+            description:
+              type: str
+        new_failure:
+          type: object
+          required: false
+          properties:
+            approach:
+              type: str
+            reason:
+              type: str
